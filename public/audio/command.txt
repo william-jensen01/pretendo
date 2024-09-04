@@ -1,0 +1,5 @@
+Convert audio to Gameboy-like audio
+ffmpeg -i **input** -acodec pcm_u8 -ar 8000 -af "highpass=f=100,lowpass=f=4000,aformat=channel_layouts=mono,aformat=channel_layouts=stereo,pan=stereo|c1=c0" **export**
+
+Combine files into sprite
+audiosprite --output **export** -f howler --export **file type**  **inputs** --gap 0.1 --ignorerounding 1 --channels 2

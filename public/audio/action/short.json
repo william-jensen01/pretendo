@@ -1,0 +1,15 @@
+{
+  "urls": [
+    "short.m4a"
+  ],
+  "sprite": {
+    "action_press_short": [
+      0,
+      146.82539682539684
+    ],
+    "action_release_short": [
+      246.82539682539684,
+      155.46485260770976
+    ]
+  }
+}

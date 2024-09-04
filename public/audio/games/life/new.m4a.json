@@ -1,0 +1,19 @@
+{
+  "urls": [
+    "new.m4a.m4a"
+  ],
+  "sprite": {
+    "distorted_8k_everything": [
+      0,
+      1536
+    ],
+    "easter_egg_8k_everything": [
+      1636.0000000000002,
+      8448
+    ],
+    "start_8k": [
+      10184,
+      359.99999999999943
+    ]
+  }
+}

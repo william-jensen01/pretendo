@@ -1,95 +1,105 @@
-import Image from "next/image";
+"use client";
+import {
+	useState,
+	Suspense,
+	useMemo,
+	useCallback,
+	useEffect,
+	useRef,
+} from "react";
+// import oldGameBoy from "@/app/components/GameBoy/old";
+import GameBoy from "@/app/components/GameBoy";
+import Manual from "@/app/components/Manual";
+import GamePak from "@/app/components/GamePak";
+import Notification from "@/app/components/Notification";
 import styles from "./page.module.css";
+import { useGameBoyStore } from "./store/gameboy";
+import {
+	DndContext,
+	useDndContext,
+	useSensor,
+	useSensors,
+	PointerSensor,
+	TouchSensor,
+} from "@dnd-kit/core";
+import { rectIntersection } from "@/app/util/rectIntersection";
+import useSound from "@/app/util/useSound";
+// import Life from "@/app/games/life";
+// import Snake from "@/app/games/snake";
+
+// const GamePakLookup = {
+// 	life: Life,
+// 	snake: Snake,
+// };
+
+const games = ["life", "snake"];
 
 export default function Home() {
-  return (
-    <main className={styles.main}>
-      <div className={styles.description}>
-        <p>
-          Get started by editing&nbsp;
-          <code className={styles.code}>src/app/page.js</code>
-        </p>
-        <div>
-          <a
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className={styles.vercelLogo}
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
-      </div>
+	const message = useGameBoyStore((state) => state.message);
+	const game = useGameBoyStore((state) => state.game);
+	const setGame = useGameBoyStore((state) => state.setGame);
+	const zoom = useGameBoyStore((state) => state.zoom);
+	const eeUnlocked = useGameBoyStore((state) => state.eeUnlocked);
+	const [isDragging, setIsDragging] = useState(false);
+	const pageRef = useRef(null);
+	const [playPakInsert] = useSound("/audio/pak_insert.m4a", {
+		volume: 1,
+		ignoreConsoleVolume: true,
+	});
 
-      <div className={styles.center}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
+	const sensors = useSensors(
+		useSensor(PointerSensor, {
+			activationConstraint: {
+				// distance: 0,
+				// delay: 1000,
+			},
+		}),
+		useSensor(TouchSensor, {
+			activationConstraint: {
+				// delay: 1000,
+				// tolerance: 5,
+				// tolerance: 50,
+			},
+		})
+	);
 
-      <div className={styles.grid}>
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Docs <span>-&gt;</span>
-          </h2>
-          <p>Find in-depth information about Next.js features and API.</p>
-        </a>
+	return (
+		<Suspense>
+			<DndContext
+				sensors={sensors}
+				onDragStart={(e) => {
+					setIsDragging(true);
+				}}
+				onDragEnd={(e) => {
+					const { active, over } = e;
+					if (over && !game) {
+						setGame(active.id);
+						playPakInsert();
+					}
+					setIsDragging(false);
+				}}
+				collisionDetection={(e) => rectIntersection({ ...e, zoom })}
+			>
+				<main
+					ref={pageRef}
+					className={styles.main}
+					style={{ "--zoom": zoom[0] }}
+					// styles={{ touchAction: isDragging ? "none" : "manipulation" }}
+				>
+					<GameBoy dragging={isDragging} pageRef={pageRef} />
+					<div className={styles.games}>
+						{games.map((g) => {
+							if ((g === "snake" && !eeUnlocked) || g === game)
+								return <div key={g} className={styles.place} />;
 
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Learn <span>-&gt;</span>
-          </h2>
-          <p>Learn about Next.js in an interactive course with&nbsp;quizzes!</p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Templates <span>-&gt;</span>
-          </h2>
-          <p>Explore starter templates for Next.js.</p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Deploy <span>-&gt;</span>
-          </h2>
-          <p>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  );
+							const src = `/games/${g}.png`;
+							return <GamePak key={g} name={g} imageUrl={src} />;
+						})}
+					</div>
+					<Manual zoom={zoom} />
+				</main>
+				<Notification message={message} />
+			</DndContext>
+		</Suspense>
+	);
 }

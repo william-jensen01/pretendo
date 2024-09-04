@@ -1,0 +1,214 @@
+.pak {
+	/* width: 380px; */
+	/* height: 435px; */
+	/* aspect-ratio: 380 / 435; */
+
+	/* width: 424.127px; */
+	/* measurements came from a 3d model */
+	width: 397px;
+	height: 454px;
+	aspect-ratio: 397 / 454;
+	/* border: 1px solid black; */
+	position: relative;
+	/* overflow: hidden; */
+	border-bottom-right-radius: 10px;
+	border-bottom-left-radius: 10px;
+	/* background: url("../../../../public/games/pak.png"); */
+	/* background-size: 100%; */
+	/* background: #847b83; */
+	/* background-size: 50%; */
+	cursor: inherit;
+	touch-action: none;
+	cursor: grab;
+}
+
+.pak * {
+	/* opacity: 0; */
+	/* background: transparent !important; */
+	/* border: 1px solid red; */
+}
+
+.block {
+	width: 360px;
+	height: 20px;
+	border-top-left-radius: 10px;
+	border-top-right-radius: 10px;
+	background-color: #7f747e;
+	position: relative;
+}
+
+.square {
+	background-color: #7f747e;
+	width: 100%;
+	height: calc(100% - 12px - 20px - 5px);
+	padding-top: 12px;
+	border-top-right-radius: 10px;
+	border-bottom-left-radius: 10px;
+	border-bottom-right-radius: 10px;
+	position: relative;
+}
+.header {
+	/* margin-top: 12px; */
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+}
+.stripe {
+	display: block;
+	width: 100%;
+	/* width: calc(100% - 7px); */
+	/* background-color: blue; */
+	height: 10px;
+	/* border: 1px solid blue; */
+	box-shadow: 0 -1px 2px 1px rgba(255, 255, 255, 0.2),
+		inset 0px -1px 2px 1px rgba(0, 0, 0, 0.25);
+}
+
+.pak > * {
+	/* display: none; */
+	/* opacity: 0.75; */
+}
+
+.pill {
+	position: absolute;
+	left: 50%;
+	top: 6px;
+	transform: translateX(-50%);
+	/* border: 1px solid red; */
+	border-radius: 100px;
+	box-shadow: 0px 0px 0px 7.5px #7e747e,
+		inset 0px 0px 0px 1px rgba(0, 0, 0, 0.15);
+	/* background-color: #847b83; */
+	/* z-index: 1; */
+
+	background: linear-gradient(180deg, #70656f 0%, #978e97 100%);
+}
+
+.logo {
+	margin: 22px;
+	display: flex;
+	align-items: baseline;
+	color: #999099;
+	text-shadow: 0px 1px rgba(0, 0, 0, 0.5);
+}
+
+.logo > *:nth-child(1) {
+	letter-spacing: 1px;
+	font-size: 18px;
+}
+.logo > *:nth-child(2) {
+	font-size: 28px;
+	font-style: italic;
+	font-weight: bold;
+	/* font-size: 40px; */
+	/* font-style: italic; */
+}
+.logo > *:nth-child(3) {
+	/* display: inline-block; */
+	vertical-align: sub;
+	font-size: 14px;
+	letter-spacing: 2px;
+}
+
+/* .bottom {
+	border: 1px solid orange;
+	width: 100%;
+	display: grid;
+	grid-template-columns: 10px 250px 10px;
+	justify-content: space-between;
+} */
+
+.coverContainer {
+	--cover-gap: 7.5px;
+	border-radius: 10px;
+	background-color: #847b83;
+
+	width: 100%;
+	max-width: calc(300px - (var(--cover-gap) * 2));
+	height: calc(275px - (var(--cover-gap) * 2));
+	padding: var(--cover-gap);
+
+	/* border: 1px solid red; */
+	position: absolute;
+	left: 50%;
+	bottom: calc((7.5px * 2) + 38px);
+	transform: translateX(-50%);
+	box-shadow: inset 0px -1px 0px 0px rgba(0, 0, 0, 0.25),
+		inset 0px 1px 0px 0px rgba(255, 255, 255, 0.15);
+	touch-action: none;
+}
+.cover {
+	max-width: calc(100% - (var(--cover-gap) * 2));
+	max-height: calc(100% - (var(--cover-gap) * 2));
+	transform: translate(var(--cover-gap), var(--cover-gap));
+	border-radius: 10px;
+	/* padding: 7.5px; */
+	/* aspect-ratio: 295 / 245 !important; */
+
+	/* width: calc(100% - 15px); */
+	/* height: calc(100% - 30px); */
+	/* width: 275px; */
+	/* height: 245px; */
+	position: relative;
+}
+.cover::before {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	/* width: max-content; */
+	/* border: 1px solid rgba(255, 255, 255, 0.1); */
+	background: rgba(255, 255, 255, 0.125);
+	color: rgba(255, 255, 255, 0.5);
+	width: 100%;
+	height: 100%;
+	display: grid;
+	place-content: center;
+	border-radius: 10px;
+	text-transform: capitalize;
+}
+
+/* .left,
+.right {
+	background-color: black;
+} */
+.left,
+.right {
+	width: 10px;
+	height: 265px;
+	background-color: rgba(0, 0, 0, 0.15);
+
+	position: absolute;
+	bottom: 2px;
+	box-shadow: 0 -1px 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.left {
+	left: 0px;
+	border-top-right-radius: 2px;
+	border-bottom-left-radius: 10px;
+}
+.right {
+	right: 0px;
+	border-top-left-radius: 2px;
+	border-bottom-right-radius: 10px;
+}
+
+.arrow {
+	--arrow-width: 60px;
+	position: absolute;
+	bottom: 0;
+	left: 50%;
+	transform: translateX(-50%);
+	border-left: calc(var(--arrow-width) / 2) solid transparent;
+	border-right: calc(var(--arrow-width) / 2) solid transparent;
+
+	border-top: calc((var(--arrow-width) * 0.62)) solid #857c84;
+	border-radius: 10px;
+
+	margin-top: 7.5px;
+	margin-bottom: 12px;
+
+	/* opacity: 0.1; */
+}
