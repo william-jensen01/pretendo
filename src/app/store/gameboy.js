@@ -21,7 +21,6 @@ const initialState = {
 	pak: null,
 	// bricked: false,
 	gameState: EmptyPak,
-	eeUnlocked: false,
 };
 export const useGameBoyStore = create(
 	devtools(
@@ -49,6 +48,7 @@ export const useGameBoyStore = create(
 			// zoom: 100,
 			zoom: [100, 0], // [0] is zoom factor, [1] is missing amount from zoom
 
+			eeUnlocked: false,
 			setZoom: createStateUpdater("zoom")(set),
 
 			// eeUnlocked: localStorage?.getItem("eeUnlocked") ?? false,
