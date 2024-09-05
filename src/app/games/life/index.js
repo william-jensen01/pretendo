@@ -160,6 +160,7 @@ export default memo(function Life({
 		let hasQuery = false;
 		const newGrid = create2dArray();
 		for (const key of searchParams.keys()) {
+			if (key === "disable-zoom") continue;
 			if (key) hasQuery = true;
 			const row = parseInt(key);
 			const cols = searchParams.get(key).split(" ");

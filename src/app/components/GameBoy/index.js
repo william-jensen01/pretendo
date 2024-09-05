@@ -318,27 +318,33 @@ export default function GameBoy({ dragging, pageRef }) {
 
 	useEffect(
 		() => {
-			// Calculate required zoom level to fit console in viewport
-			// Uses the minimum zoom factor from width and height
-			let elementHeight = document.querySelector("#container").offsetHeight;
-			let elementWidth = document.querySelector("#container").offsetWidth;
-			// let elementHeight = document.body.offsetHeight;
-			let vpHeight = window.innerHeight;
-			let vpWidth = window.innerWidth;
-			let zoomLevelH = (vpHeight / elementHeight) * 95;
-			let originalLevelH = (vpHeight / elementHeight) * 100;
-			let zoomLevelW = (vpWidth / elementWidth) * 95;
-			let originalLevelW = (vpWidth / elementWidth) * 100;
+			// using URLSearchParams instead of useSearchParams because I don't want extra re-renders
+			const disableZoom = new URLSearchParams(window.location.search).has(
+				"disable-zoom"
+			);
+			if (!disableZoom) {
+				// Calculate required zoom level to fit console in viewport
+				// Uses the minimum zoom factor from width and height
+				let elementHeight = document.querySelector("#container").offsetHeight;
+				let elementWidth = document.querySelector("#container").offsetWidth;
+				// let elementHeight = document.body.offsetHeight;
+				let vpHeight = window.innerHeight;
+				let vpWidth = window.innerWidth;
+				let zoomLevelH = (vpHeight / elementHeight) * 95;
+				let originalLevelH = (vpHeight / elementHeight) * 100;
+				let zoomLevelW = (vpWidth / elementWidth) * 95;
+				let originalLevelW = (vpWidth / elementWidth) * 100;
 
-			const zoomLevel = Math.min(zoomLevelH, zoomLevelW);
-			setZoom([
-				zoomLevel,
-				zoomLevel === zoomLevelH ? originalLevelH : originalLevelW,
-			]);
+				const zoomLevel = Math.min(zoomLevelH, zoomLevelW);
+				setZoom([
+					zoomLevel,
+					zoomLevel === zoomLevelH ? originalLevelH : originalLevelW,
+				]);
 
-			// using transform: scale instead of zoom because of issues with dnd-kit
-			pageRef.current.style.transform = `scale(${zoomLevel / 100})`;
-			pageRef.current.style.transformOrigin = "top left";
+				// using transform: scale instead of zoom because of issues with dnd-kit
+				pageRef.current.style.transform = `scale(${zoomLevel / 100})`;
+				pageRef.current.style.transformOrigin = "top left";
+			}
 
 			const handleKeyDown = (e) => {
 				e.preventDefault();
