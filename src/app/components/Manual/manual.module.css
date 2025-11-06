@@ -158,6 +158,8 @@
 	--thumbs-slide-spacing: 0.8rem;
 	--thumbs-slide-height: 6rem;
 	height: 100%;
+	width: 100%;
+	overflow: hidden;
 }
 
 .thumbsViewport {
