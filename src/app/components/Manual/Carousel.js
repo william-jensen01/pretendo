@@ -11,13 +11,7 @@ import { NES } from "@/app/fonts";
 
 import styles from "@/app/components/Manual/manual.module.css";
 
-export default function Carousel({
-	slides,
-	options,
-	dialogRef,
-	isManualModal,
-	setIsManualModal,
-}) {
+export default function Carousel({ slides, options, toggleDialog }) {
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const [emblaMainRef, emblaMainApi] = useEmblaCarousel(options);
 	const [emblaThumbsRef, emblaThumbsApi] = useEmblaCarousel({
@@ -74,7 +68,10 @@ export default function Carousel({
 
 			<div className={styles.controls}>
 				<div className={styles.buttons}>
-					<PrevButton onClick={onPrevButtonClick} disabled={prevBtnDisabled} />
+					<PrevButton
+						onClick={onPrevButtonClick}
+						disabled={prevBtnDisabled}
+					/>
 					<NextButton
 						autoFocus
 						onClick={onNextButtonClick}
@@ -104,13 +101,13 @@ export default function Carousel({
 					method="dialog"
 					onSubmit={(e) => {
 						e.preventDefault();
-						if (dialogRef.current.matches(":modal")) {
-							setIsManualModal(false);
-							setSelectedIndex(0);
-							emblaMainApi.scrollTo(0);
-						} else {
-							setIsManualModal(true);
-						}
+
+						toggleDialog((prev) => {
+							if (prev) {
+								setSelectedIndex(0);
+								emblaMainApi.scrollTo(0);
+							}
+						});
 					}}
 				>
 					<button
@@ -122,7 +119,8 @@ export default function Carousel({
 					</button>
 				</form>
 				<p className={styles.pagination}>
-					<sup>{selectedIndex + 1}</sup>&frasl;<sub>{slides.length}</sub>
+					<sup>{selectedIndex + 1}</sup>&frasl;
+					<sub>{slides.length}</sub>
 					{/* {selectedIndex + 1}&frasl;{slides.length} */}
 				</p>
 			</div>

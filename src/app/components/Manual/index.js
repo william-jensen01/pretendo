@@ -1,10 +1,4 @@
-import {
-	useCallback,
-	useRef,
-	useState,
-	useEffect,
-	useLayoutEffect,
-} from "react";
+import { useRef, useEffect, useLayoutEffect } from "react";
 
 import Carousel from "@/app/components/Manual/Carousel";
 import Page from "@/app/components/Manual/Page";
@@ -31,18 +25,37 @@ const imageFiles = [
 const OPTIONS = { loop: false };
 
 export default function Manual({ zoom }) {
-	const [isManualModal, setIsManualModal] = useState(true);
 	const dialogRef = useRef();
-	const openRef = useRef();
-	useLayoutEffect(() => {
-		if (dialogRef.current) {
-			if (dialogRef.current.matches(":modal")) {
-				dialogRef.current.close();
-			} else {
-				dialogRef.current.showModal();
-			}
+
+	const openDialog = () => {
+		if (!dialogRef.current) return;
+		dialogRef.current.showModal();
+	};
+	const closeDialog = () => {
+		if (!dialogRef.current) return;
+		dialogRef.current.close();
+	};
+
+	const toggleDialog = (callback) => {
+		if (!dialogRef.current) return;
+
+		const isOpen = dialogRef.current.matches(":modal");
+
+		// initiate callback before updating dialog to ensure correct "prev" state is passed
+		if (callback) {
+			callback(isOpen);
 		}
-	}, [isManualModal]);
+
+		if (isOpen) {
+			closeDialog();
+		} else {
+			openDialog();
+		}
+	};
+
+	useLayoutEffect(() => {
+		openDialog();
+	}, []);
 
 	useEffect(() => {
 		const handleKeyPress = (e) => {
@@ -75,9 +88,7 @@ export default function Manual({ zoom }) {
 					<Carousel
 						slides={imageFiles}
 						options={OPTIONS}
-						dialogRef={dialogRef}
-						isManualModal={isManualModal}
-						setIsManualModal={setIsManualModal}
+						toggleDialog={toggleDialog}
 					/>
 				</div>
 			</dialog>
@@ -85,9 +96,7 @@ export default function Manual({ zoom }) {
 			<button
 				className={styles.cover}
 				onClick={() => {
-					if (!isManualModal) {
-						setIsManualModal(true);
-					}
+					toggleDialog();
 				}}
 			>
 				<Page
@@ -96,7 +105,7 @@ export default function Manual({ zoom }) {
 					className={styles.emblaSlideNumber}
 					quality={100}
 				/>
-				<div className={styles.open} ref={openRef}>
+				<div className={styles.open}>
 					<svg
 						viewBox="0 0 416 416"
 						fill="none"
