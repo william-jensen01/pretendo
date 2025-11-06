@@ -6,6 +6,7 @@ import {
 	useCallback,
 	useEffect,
 	useRef,
+	useLayoutEffect,
 } from "react";
 // import oldGameBoy from "@/app/components/GameBoy/old";
 import GameBoy from "@/app/components/GameBoy";
@@ -40,6 +41,7 @@ export default function Home() {
 	const setGame = useGameBoyStore((state) => state.setGame);
 	const zoom = useGameBoyStore((state) => state.zoom);
 	const eeUnlocked = useGameBoyStore((state) => state.eeUnlocked);
+	const setEEUnlocked = useGameBoyStore((state) => state.setEEUnlocked);
 	const [isDragging, setIsDragging] = useState(false);
 	const pageRef = useRef(null);
 	const [playPakInsert] = useSound("/audio/pak_insert.m4a", {
@@ -62,6 +64,11 @@ export default function Home() {
 			},
 		})
 	);
+
+	useLayoutEffect(() => {
+		const unlocked = localStorage.getItem("eeUnlocked");
+		setEEUnlocked(unlocked === "true");
+	}, [setEEUnlocked]);
 
 	return (
 		<Suspense>

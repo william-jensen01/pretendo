@@ -45,16 +45,14 @@ export const useGameBoyStore = create(
 
 			setPak: createStateUpdater("pak")(set),
 			setBricked: createStateUpdater("bricked")(set),
-			// zoom: 100,
 			zoom: [100, 0], // [0] is zoom factor, [1] is missing amount from zoom
-
-			eeUnlocked: false,
 			setZoom: createStateUpdater("zoom")(set),
 
-			// eeUnlocked: localStorage?.getItem("eeUnlocked") ?? false,
+			eeUnlocked: false,
+			setEEUnlocked: (v) => set({ eeUnlocked: v }),
 			unlockEasterEgg: () => {
-				// localStorage.setItem("eeUnlocked", true);
-				set({ eeUnlocked: true });
+				localStorage?.setItem("eeUnlocked", true);
+				get().setEEUnlocked(true);
 			},
 
 			reset: () =>
