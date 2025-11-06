@@ -43,6 +43,7 @@ export default function Home() {
 	const eeUnlocked = useGameBoyStore((state) => state.eeUnlocked);
 	const setEEUnlocked = useGameBoyStore((state) => state.setEEUnlocked);
 	const [isDragging, setIsDragging] = useState(false);
+	const [showPaks, setShowPaks] = useState(false);
 	const pageRef = useRef(null);
 	const [playPakInsert] = useSound("/audio/pak_insert.m4a", {
 		volume: 1,
@@ -68,6 +69,7 @@ export default function Home() {
 	useLayoutEffect(() => {
 		const unlocked = localStorage.getItem("eeUnlocked");
 		setEEUnlocked(unlocked === "true");
+		setShowPaks(true);
 	}, [setEEUnlocked]);
 
 	return (
@@ -96,7 +98,14 @@ export default function Home() {
 					<GameBoy dragging={isDragging} pageRef={pageRef} />
 					<div className={styles.games}>
 						{games.map((g) => {
-							if ((g === "snake" && !eeUnlocked) || g === game)
+							if (
+								// don't show snake pak if easter egg is not unlocked
+								(g === "snake" && !eeUnlocked) ||
+								// don't show pak if it is not the current game
+								g === game ||
+								// don't show pak if they are not shown
+								!showPaks
+							)
 								return <div key={g} className={styles.place} />;
 
 							const src = `/games/${g}.png`;
