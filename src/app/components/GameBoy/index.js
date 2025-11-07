@@ -20,6 +20,7 @@ import GamePak from "@/app/components/GamePak";
 import { useDroppable } from "@dnd-kit/core";
 import EmptyPak from "@/app/games/empty";
 import useSound from "@/app/util/useSound";
+import { DURATIONS } from "@/app/constants";
 
 export default function GameBoy({ dragging, pageRef }) {
 	const {
@@ -151,7 +152,7 @@ export default function GameBoy({ dragging, pageRef }) {
 				pak.classList.toggle("insert");
 				pak.classList.toggle("pull");
 				playPakPull();
-				await delay(250);
+				await delay(DURATIONS.PAK_MOVE);
 				setGame("");
 				changeRunning(false);
 				if (stopAnimationRef.current) {
@@ -249,19 +250,19 @@ export default function GameBoy({ dragging, pageRef }) {
 		if (!loaded) {
 			while (!loaded) {
 				console.log("waiting for game pak to load");
-				await delay(100);
+				await delay(DURATIONS.PAK_LOAD);
 			}
 		}
 
 		playStartup();
 
-		await delay(1250);
+		await delay(DURATIONS.WELCOME_PAUSE);
 
 		changeRunning(false);
 
 		setGrid(create2dArray());
 
-		await delay(200);
+		await delay(DURATIONS.WELCOME_LOAD_GAME);
 
 		initializingRef.current = false;
 		gameStateRef.current.loadGame();
@@ -292,14 +293,14 @@ export default function GameBoy({ dragging, pageRef }) {
 		changeRunning(false);
 		powerOff();
 		setGame(newGame);
-		await delay(500);
+		await delay(DURATIONS.BETWEEN_GAMES);
 		powerOn();
 	}
 
 	async function changeGameWhilePowered(newGame) {
 		await removeGamePak();
 		setGrid(create2dArray());
-		await delay(500);
+		await delay(DURATIONS.BETWEEN_GAMES);
 		setGame(newGame);
 		loadGamePak(newGame).then(async (gamepak) => {
 			setPak(gamepak);
@@ -309,7 +310,7 @@ export default function GameBoy({ dragging, pageRef }) {
 			if (!gameStateRef.current.name) {
 				while (!gameStateRef.current.name) {
 					console.log("waiting for game pak to initialize");
-					await delay(100);
+					await delay(DURATIONS.PAK_LOAD);
 				}
 			}
 			gameStateRef.current.loadGame();

@@ -1,4 +1,5 @@
 import { Inter } from "next/font/google";
+import { DURATIONS } from "@/app/constants";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -12,6 +13,14 @@ export const metadata = {
 export default function RootLayout({ children }) {
 	return (
 		<html lang="en">
+			<head>
+				<style>{`
+					:root {
+						--pak-move-duration: ${DURATIONS.PAK_MOVE}ms;
+						--blinking-duration: ${DURATIONS.BLINKING}ms;
+					}
+				`}</style>
+			</head>
 			<body className={inter.className}>{children}</body>
 		</html>
 	);
