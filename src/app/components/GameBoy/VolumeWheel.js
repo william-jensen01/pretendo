@@ -1,8 +1,12 @@
 import Image from "next/image";
 import { useRef, useState, useCallback, memo } from "react";
 import wheelPic from "@public/volume-wheel.png";
+import { useGameBoyStore } from "@/app/store/gameboy";
 
-export default memo(function VolumeWheel({ changeVolume }) {
+export default memo(function VolumeWheel() {
+	const changeVolumeAndMessage = useGameBoyStore(
+		(state) => state.changeVolumeAndMessage
+	);
 	const [rotation, setRotation] = useState(-90); // default volume is 0.5 so rotation is -90
 	const wheelRef = useRef(null);
 	const draggingRef = useRef(null);
@@ -40,9 +44,9 @@ export default memo(function VolumeWheel({ changeVolume }) {
 
 			const newVolume = -1 * (newRotation / 180);
 			setRotation(newRotation);
-			changeVolume(newVolume.toFixed(2));
+			changeVolumeAndMessage(newVolume.toFixed(2));
 		},
-		[rotation, changeVolume]
+		[rotation, changeVolumeAndMessage]
 	);
 
 	return (

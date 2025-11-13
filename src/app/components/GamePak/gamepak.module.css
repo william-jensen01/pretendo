@@ -1,22 +1,10 @@
 .pak {
-	/* width: 380px; */
-	/* height: 435px; */
-	/* aspect-ratio: 380 / 435; */
-
-	/* width: 424.127px; */
-	/* measurements came from a 3d model */
-	width: 397px;
-	height: 454px;
-	aspect-ratio: 397 / 454;
-	/* border: 1px solid black; */
+	--_block-height: 20px;
+	width: var(--gamepak-width);
+	height: var(--gamepak-height);
 	position: relative;
-	/* overflow: hidden; */
 	border-bottom-right-radius: 10px;
 	border-bottom-left-radius: 10px;
-	/* background: url("../../../../public/games/pak.png"); */
-	/* background-size: 100%; */
-	/* background: #847b83; */
-	/* background-size: 50%; */
 	cursor: inherit;
 	touch-action: none;
 	cursor: grab;
@@ -29,8 +17,10 @@
 }
 
 .block {
-	width: 360px;
-	height: 20px;
+	/* width: 328px; */
+	/* width: calc(var(--gamepak-width) * 0.885); */
+	width: calc(var(--gamepak-width) * 0.885);
+	height: var(--_block-height);
 	border-top-left-radius: 10px;
 	border-top-right-radius: 10px;
 	background-color: #7f747e;
@@ -40,7 +30,7 @@
 .square {
 	background-color: #7f747e;
 	width: 100%;
-	height: calc(100% - 12px - 20px - 5px);
+	height: calc(100% - var(--_block-height) - 12px);
 	padding-top: 12px;
 	border-top-right-radius: 10px;
 	border-bottom-left-radius: 10px;
@@ -211,4 +201,11 @@
 	margin-bottom: 12px;
 
 	/* opacity: 0.1; */
+}
+.back {
+	position: absolute;
+	inset: 0;
+	background-color: #7f747e;
+	border-radius: inherit;
+	z-index: -1;
 }

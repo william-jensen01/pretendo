@@ -34,6 +34,11 @@ export const useGameBoyStore = create(
 			setRunning: createStateUpdater("running")(set),
 			volume: 0.5,
 			setVolume: createStateUpdater("volume")(set),
+			changeVolumeAndMessage: (v) =>
+				set({
+					volume: Number(v),
+					message: `Volume: ${v}`,
+				}),
 			message: "",
 			setMessage: createStateUpdater("message")(set),
 			setGameState: (newGameState) => {

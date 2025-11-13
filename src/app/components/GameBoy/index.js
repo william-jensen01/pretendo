@@ -15,7 +15,6 @@ import {
 } from "@/app/util/helper";
 import { useGameBoyStore } from "@/app/store/gameboy";
 import { useShallow } from "zustand/react/shallow";
-import { flushSync } from "react-dom";
 import GamePak from "@/app/components/GamePak";
 import { useDroppable } from "@dnd-kit/core";
 import EmptyPak from "@/app/games/empty";
@@ -26,51 +25,39 @@ export default function GameBoy({ dragging, pageRef }) {
 	const {
 		powerStatus,
 		setPowerStatus,
-		volume,
-		setVolume,
 		game,
 		setGame,
-		grid,
 		setGrid,
 		running,
 		setRunning,
 		gameState,
 		setGameState,
-		setMessage,
 		pak,
 		setPak,
 		bricked,
-		setBricked,
 		setZoom,
 		resetGameBoy,
 	} = useGameBoyStore(
 		useShallow((state) => ({
 			powerStatus: state.powerStatus,
 			setPowerStatus: state.setPowerStatus,
-			volume: state.volume,
-			setVolume: state.setVolume,
 			game: state.game,
 			setGame: state.setGame,
-			grid: state.grid,
 			setGrid: state.setGrid,
 			running: state.running,
 			setRunning: state.setRunning,
 			gameState: state.gameState,
 			setGameState: state.setGameState,
-			setMessage: state.setMessage,
 			pak: state.pak,
 			setPak: state.setPak,
 			bricked: state.bricked,
-			setBricked: state.setBricked,
 			setZoom: state.setZoom,
 			resetGameBoy: state.reset,
 		}))
 	);
 
-	// const [powerStatus, setPowerStatus] = useState(0);
 	const [clickOrder, setClickOrder] = useState([]);
 	const [clickTimer, setClickTimer] = useState(null);
-	const [showCredits, setShowCredits] = useState(false);
 
 	const [playStartup] = useSound("/audio/startup.wav", {
 		volume: 0.5,
@@ -185,12 +172,16 @@ export default function GameBoy({ dragging, pageRef }) {
 				for (let i = 0; i < limit; i++) {
 					// Calculate the target row in tempGrid where we'll repalce the new data
 					// As iteration increases, this moves downward in tempGrid
-					const targetRow = i + Math.max(0, iteration - adjustedTotalRows);
+					const targetRow =
+						i + Math.max(0, iteration - adjustedTotalRows);
 
 					// Calculate which row from subArr to copy
 					// In early iterations, this starts from the bottom of subArr
 					// As iteration increases, this moves upward in subArr
-					const sourceRow = Math.max(i, adjustedTotalRows - iteration + i);
+					const sourceRow = Math.max(
+						i,
+						adjustedTotalRows - iteration + i
+					);
 
 					// Copy the calculated row from subArr to the appropriate row in tempGrid
 					tempGrid[targetRow] = [...subArr[sourceRow]];
@@ -216,7 +207,10 @@ export default function GameBoy({ dragging, pageRef }) {
 				}
 			};
 
-			const { animate, stop } = continuouslyAnimate(runningRef, operation);
+			const { animate, stop } = continuouslyAnimate(
+				runningRef,
+				operation
+			);
 
 			stopAnimationRef.current = stop;
 
@@ -280,7 +274,8 @@ export default function GameBoy({ dragging, pageRef }) {
 	}
 
 	async function phasePower(e) {
-		const button = e.currentTarget ?? document.querySelector("#power-button");
+		const button =
+			e.currentTarget ?? document.querySelector("#power-button");
 		button.classList.toggle("on");
 		if (powerStatus) {
 			powerOff();
@@ -326,8 +321,11 @@ export default function GameBoy({ dragging, pageRef }) {
 			if (!disableZoom) {
 				// Calculate required zoom level to fit console in viewport
 				// Uses the minimum zoom factor from width and height
-				let elementHeight = document.querySelector("#container").offsetHeight;
-				let elementWidth = document.querySelector("#container").offsetWidth;
+				const container = document.querySelector("#container");
+				if (!container || !pageRef.current) return;
+				console.log("adjusted container", container);
+				let elementHeight = container.offsetHeight;
+				let elementWidth = container.offsetWidth;
 				// let elementHeight = document.body.offsetHeight;
 				let vpHeight = window.innerHeight;
 				let vpWidth = window.innerWidth;
@@ -501,26 +499,11 @@ export default function GameBoy({ dragging, pageRef }) {
 				callback();
 			}
 
-			// if (
-			// 	updatedClickOrder.length > 1 &&
-			// 	updatedClickOrder[updatedClickOrder.length - 1] !== "start"
-			// ) {
-			// 	callback();
-			// }
-
-			// const recentId = updatedClickOrder[updatedClickOrder.length - 1];
-			// if (recentId !== "select" && recentId !== "start") {
-			// 	callback();
-			// } else {
-			// 	if (!clickTimer) {
-			// 		callback();
-			// 	}
-			// }
-
 			setClickTimer(
 				setTimeout(() => {
 					// Handle game ee/shortcuts
-					const shortcuts = gameStateRef.current.handleGameEEShortcuts;
+					const shortcuts =
+						gameStateRef.current.handleGameEEShortcuts;
 					if (shortcuts.length > 0) {
 						shortcuts.forEach(([sequence, callback]) => {
 							if (checkClickOrder(updatedClickOrder, sequence)) {
@@ -528,13 +511,6 @@ export default function GameBoy({ dragging, pageRef }) {
 							}
 						});
 					}
-
-					// if (checkClickOrder(updatedClickOrder, shCopyScreenState)) {
-					// 	copyScreenState();
-					// 	setMessage("Copied screen to clipboard");
-
-					// 	resetClickOrder();
-					// }
 
 					resetClickOrder();
 					setClickTimer(null);
@@ -549,14 +525,6 @@ export default function GameBoy({ dragging, pageRef }) {
 			if (clickTimer) clearTimeout(clickTimer);
 		};
 	}, [clickTimer]);
-
-	const changeVolume = useCallback(
-		(value) => {
-			setVolume(Number(value));
-			setMessage(`Volume: ${value}`);
-		},
-		[setVolume, setMessage]
-	);
 
 	const handleDpad = useCallback(
 		(e) => {
@@ -583,29 +551,6 @@ export default function GameBoy({ dragging, pageRef }) {
 		},
 		[powerStatus, game, bricked, handleClickEE]
 	);
-
-	// const handleDpad = (e) => {
-	// 	const id = e.currentTarget?.id ?? e.target?.id;
-	// 	if (!id) return;
-	// 	const directionLookup = {
-	// 		up: [-1, 0],
-	// 		down: [1, 0],
-	// 		right: [0, 1],
-	// 		left: [0, -1],
-	// 	};
-	// 	if (
-	// 		!directionLookup.hasOwnProperty(id) ||
-	// 		!powerStatus ||
-	// 		!game ||
-	// 		bricked ||
-	// 		initializingRef.current
-	// 	) {
-	// 		return;
-	// 	}
-
-	// 	const [r, c] = directionLookup[id];
-	// 	handleClickEE(e, () => gameStateRef.current.handleGameDpad(r, c));
-	// };
 
 	const handleAction = (e) => {
 		if (!powerStatus || !game || bricked || initializingRef.current) return;
@@ -654,7 +599,11 @@ export default function GameBoy({ dragging, pageRef }) {
 			</div>
 			<div id="pak-slot">
 				{game && (
-					<div id="pak-game" className="insert" onClick={removeGamePak}>
+					<div
+						id="pak-game"
+						className="insert"
+						onClick={removeGamePak}
+					>
 						<GamePak
 							name={game}
 							imageUrl={`/games/${game}.png`}
@@ -676,7 +625,7 @@ export default function GameBoy({ dragging, pageRef }) {
 				className={`power-button`}
 				onClick={phasePower}
 			></button>
-			<VolumeWheel changeVolume={changeVolume} />
+			<VolumeWheel />
 			<div id="gameboy">
 				<div id="head">
 					<div className="gouge" />
@@ -703,11 +652,7 @@ export default function GameBoy({ dragging, pageRef }) {
 					>
 						<span className={Futura.className}>BATTERY</span>
 					</div>
-					<Screen
-						grid={grid}
-						powerStatus={powerStatus}
-						handleCellClick={gameState.handleGameCellClick}
-					/>
+					<Screen />
 				</div>
 				<div id="logo">
 					<span className={Pretendo.className}>Pretendo</span>

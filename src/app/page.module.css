@@ -61,8 +61,8 @@
 	padding-bottom: 18px;
 }
 .place {
-	width: 397px;
-	height: 454px;
+	width: var(--gamepak-width);
+	height: var(--gamepak-height);
 }
 
 /* .games {

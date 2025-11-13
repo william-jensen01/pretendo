@@ -1,45 +1,28 @@
 import { useRef, useEffect, useCallback, useMemo, memo } from "react";
-import { colorLookup } from "@/app/Cell";
 import { rows, columns } from "@/app/constants";
 import { useGameBoyStore } from "@/app/store/gameboy";
-import { continuouslyAnimate } from "@/app/util/helper";
 
-const width = 352;
-const height = 316.8;
-const gap = 0;
-const resolutionX = (width - columns * gap) / columns;
-const resolutionY = (height - rows * gap) / rows;
-// const width = 320;
-// const height = 288;
-// const resolutionX = 2;
-// const resolutionY = 2;
-// const width = 480;
-// const height = 432;
-// const resolutionX = 3;
-// const resolutionY = 3
-const gapX = (width - columns * resolutionX) / columns;
-const gapY = (height - rows * resolutionY) / rows;
-console.log("gapX", gapX);
-console.log("gapY", gapY);
+// Internal canvas resolution (for crisp rendering keep whole integers)
+const INTERNAL_CELL_SIZE = 8; // 8x8 pixels per Game Boy pixel
+const GRID_LINE_WIDTH = 1; // 1px grid lines (1/8 of cell size);
+const INTERNAL_WIDTH =
+	columns * (INTERNAL_CELL_SIZE + GRID_LINE_WIDTH) - GRID_LINE_WIDTH; // 1280PX (160 * (8 + 1) - 1)
+const INTERNAL_HEIGHT =
+	rows * (INTERNAL_CELL_SIZE + GRID_LINE_WIDTH) - GRID_LINE_WIDTH; // 1152PX (144 * (8 + 1) - 1)
 
-console.log("cell width", resolutionX);
-console.log("cell height", resolutionY);
+// Base display size (Game Boy screen's "natural" size before zoom)
+const BASE_DISPLAY_WIDTH = 320;
+const BASE_DISPLAY_HEIGHT = 288;
 
-/*
-	resolution of 2px
-		width: 320px
-		height: 288px
-	3px:
-		width: 480px
-		height: 432px
-
-		scale down to 352x316.8 = 
-*/
-
-export default memo(function Screen({ powerStatus, grid, handleCellClick }) {
+export default memo(function Screen() {
 	const canvasRef = useRef(null);
 	const requestIdRef = useRef(null);
+	const grid = useGameBoyStore((state) => state.grid);
 	const cursor = useGameBoyStore((state) => state.cursor);
+	const powerStatus = useGameBoyStore((state) => state.powerStatus);
+	const handleCellClick = useGameBoyStore(
+		(state) => state.gameState.handleGameCellClick
+	);
 
 	const colorLookupDefined = useMemo(
 		() => ({
@@ -60,8 +43,9 @@ export default memo(function Screen({ powerStatus, grid, handleCellClick }) {
 			const x = e.clientX - rect.left;
 			const y = e.clientY - rect.top;
 
-			const cellX = Math.floor(x / resolutionX);
-			const cellY = Math.floor(y / resolutionY);
+			// Convert from display coordinates to grid coordinates
+			const cellX = Math.floor((x / BASE_DISPLAY_WIDTH) * columns);
+			const cellY = Math.floor((y / BASE_DISPLAY_HEIGHT) * rows);
 
 			handleCellClick(e, grid, cellY, cellX);
 		},
@@ -69,9 +53,13 @@ export default memo(function Screen({ powerStatus, grid, handleCellClick }) {
 	);
 
 	const drawCell = useCallback(
-		(context, x, y, color) => {
+		(context, col, row, color) => {
 			context.fillStyle = colorLookupDefined[color];
-			context.fillRect(x, y, resolutionX, resolutionY);
+			const x =
+				col * (INTERNAL_CELL_SIZE + GRID_LINE_WIDTH) + GRID_LINE_WIDTH;
+			const y =
+				row * (INTERNAL_CELL_SIZE + GRID_LINE_WIDTH) + GRID_LINE_WIDTH;
+			context.fillRect(x, y, INTERNAL_CELL_SIZE, INTERNAL_CELL_SIZE);
 		},
 		[colorLookupDefined]
 	);
@@ -80,63 +68,60 @@ export default memo(function Screen({ powerStatus, grid, handleCellClick }) {
 		const canvas = canvasRef.current;
 		if (!canvas) return;
 
-		canvas.width = width;
-		canvas.height = height;
-
 		const context = canvas.getContext("2d");
+		if (!context) return;
 
-		// canvas.style.zoom = "0.733";
-		// canvas.style.transform = "scale(0.733)";
-		// canvas.style.width = `${width * 0.733}px`;
-		// canvas.style.height = `${height * 0.733}px`;
-		// canvas.style.width = `${width}px`;
-		// canvas.style.height = `${height}px`;
+		// Set internal resolution (high-res for crisp rendering)
+		canvas.width = INTERNAL_WIDTH;
+		canvas.height = INTERNAL_HEIGHT;
 
-		// Enable crisp edges for pixel art
+		// Set display size (base size, no zoom)
+		canvas.style.width = `${BASE_DISPLAY_WIDTH}px`;
+		canvas.style.height = `${BASE_DISPLAY_HEIGHT}px`;
+		canvas.style.imageRendering = "pixelated";
+
+		// Disable smoothing
 		context.imageSmoothingEnabled = false;
 
-		// context.clearRect(0, 0, canvas.width, canvas.height);
+		// Clear the entire canvas
+		context.fillStyle = "rgba(0,0,0,0.1)";
+		context.fillRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
 
-		grid.forEach((row, rowIdx) => {
-			row.forEach((cell, colIdx) => {
-				if (cell.color === 0) return;
-				const x = colIdx * resolutionX;
-				const y = rowIdx * resolutionY;
+		// Draw cells with gaps between them
+		for (let rowIdx = 0; rowIdx < rows; rowIdx++) {
+			for (let colIdx = 0; colIdx < columns; colIdx++) {
+				const cell = grid[rowIdx]?.[colIdx];
+				if (!cell || cell.color === undefined || cell.color === null)
+					continue;
 
-				drawCell(context, x, y, cell.color);
-			});
-		});
+				drawCell(context, colIdx, rowIdx, cell.color);
+			}
+		}
 
+		// Handle cursor animation
 		let startTime;
 
-		// Animate the cursor to create a blinking effect
 		const animate = (timestamp) => {
 			if (!startTime) startTime = timestamp;
 			const elapsedTime = timestamp - startTime;
-
-			// context.clearRect(0, 0, canvas.width, canvas.height);
+			const blinkState = Math.floor(elapsedTime / 500) % 2 === 0;
 
 			cursor?.cells?.forEach((row, rowIdx) => {
 				row.forEach((cell, colIdx) => {
+					if (!cell) return;
+
 					const gRow = (cursor.row + rowIdx) % rows;
 					const gCol = (cursor.col + colIdx) % columns;
+					const gridCell = grid[gRow]?.[gCol];
 
-					if (!cell || !gRow || !gCol) return;
+					if (!gridCell) return;
 
-					const x = gCol * resolutionX;
-					const y = gRow * resolutionY;
-					let gridCell;
-					try {
-						gridCell = grid[gRow][gCol];
-					} catch (e) {
-						console.log(e);
-						console.log(gRow, gCol);
-						return;
-					}
-
-					const blinkState = Math.floor(elapsedTime / 500) % 2 === 0;
-
-					drawCell(context, x, y, blinkState ? 1 : gridCell.color);
+					drawCell(
+						context,
+						gCol,
+						gRow,
+						blinkState ? 1 : gridCell.color
+					);
 				});
 			});
 
@@ -158,65 +143,14 @@ export default memo(function Screen({ powerStatus, grid, handleCellClick }) {
 		<div
 			id="screen"
 			style={{
-				width: `${width}px`,
-				aspectRatio: `10/9`,
-				// height: "auto",
-				// display: "grid",
-				// gridTemplateColumns: `repeat(${columns}, ${resolutionX}px)`,
-				// gridTemplateRows: `repeat(${rows}, ${resolutionY}px)`,
-				// gridGap: `${gap}px`,
+				width: `${BASE_DISPLAY_WIDTH}px`,
+				height: `${BASE_DISPLAY_HEIGHT}px`,
 				backgroundColor: powerStatus
 					? "var(--lightest-green-on)"
 					: "var(--lightest-green-off)",
 			}}
 		>
-			<canvas
-				ref={canvasRef}
-				onClick={handleCanvasClick}
-				style={{ imageRendering: "pixelated" }}
-			/>
-		</div>
-	);
-
-	return (
-		<div
-			id="screen"
-			style={{
-				// width: `${width}px`,
-				aspectRatio: `10/9`,
-				height: "auto",
-				display: "grid",
-				gridTemplateColumns: `repeat(${columns}, ${resolutionX}px)`,
-				// gridTemplateRows: `repeat(${rows}, ${resolutionY}px)`,
-				gridGap: `${gap}px`,
-				backgroundColor: powerStatus
-					? "var(--lightest-green-on)"
-					: "var(--lightest-green-off)",
-			}}
-		>
-			{powerStatus
-				? grid?.map((row, r) =>
-						row?.map((col, c) => {
-							return (
-								<div
-									key={`${r}${c}`}
-									data-row={r}
-									data-column={c}
-									className={`cell ${grid[r][c].blinking ? "blink" : ""}`}
-									// className={`cell ${
-									// 	r === active.row && c === active.col ? "blink" : undefined
-									// }`}
-									onClick={(e) => handleCellClick(e, grid, r, c)}
-									style={{
-										width: `${resolutionX}px`,
-										height: `${resolutionX}px`,
-										backgroundColor: colorLookup[grid[r][c].color],
-									}}
-								/>
-							);
-						})
-				  )
-				: ""}
+			<canvas ref={canvasRef} onClick={handleCanvasClick} />
 		</div>
 	);
 });
