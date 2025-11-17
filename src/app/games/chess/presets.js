@@ -442,3 +442,25 @@ export const whiteKing = [
 	[0, 0, 3, 3, 3, 3, 2, 3, 2, 2, 2, 2, 2, 2, 0, 0],
 	[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 ];
+
+// MARK: Helpers
+
+const pieceLookup = {
+	p: blackPawn,
+	P: whitePawn,
+	r: blackRook,
+	R: whiteRook,
+	n: blackKnightLeft,
+	N: whiteKnightLeft,
+	b: blackBishop,
+	B: whiteBishop,
+	q: blackQueen,
+	Q: whiteQueen,
+	k: blackKing,
+	K: whiteKing,
+};
+
+export const getPiece = (piece) => {
+	if (!piece || piece === ".") return;
+	return pieceLookup[piece];
+};
