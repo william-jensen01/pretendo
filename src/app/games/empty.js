@@ -5,7 +5,8 @@ const EmptyPak = {
 	runGame: () => {
 		// setRunning((prev) => !prev);
 	},
-
+	handleGameCursor: () => {},
+	isCursorAnimated: false,
 	handleGameDpad: () => {},
 	handleGameAction: () => {},
 	handleGameSelect: () => {},

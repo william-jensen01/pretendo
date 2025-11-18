@@ -16,9 +16,16 @@ const BASE_DISPLAY_HEIGHT = 288;
 
 export default memo(function Screen() {
 	const canvasRef = useRef(null);
+	const cursorCanvasRef = useRef(null);
 	const requestIdRef = useRef(null);
 	const grid = useGameBoyStore((state) => state.grid);
 	const cursor = useGameBoyStore((state) => state.cursor);
+	const handleGameCursor = useGameBoyStore(
+		(state) => state.gameState.handleGameCursor
+	);
+	const isCursorAnimated = useGameBoyStore(
+		(state) => state.gameState.isCursorAnimated
+	);
 	const powerStatus = useGameBoyStore((state) => state.powerStatus);
 	const handleCellClick = useGameBoyStore(
 		(state) => state.gameState.handleGameCellClick
@@ -64,10 +71,7 @@ export default memo(function Screen() {
 		[colorLookupDefined]
 	);
 
-	useEffect(() => {
-		const canvas = canvasRef.current;
-		if (!canvas) return;
-
+	const configureCanvas = useCallback((canvas) => {
 		const context = canvas.getContext("2d");
 		if (!context) return;
 
@@ -79,9 +83,17 @@ export default memo(function Screen() {
 		canvas.style.width = `${BASE_DISPLAY_WIDTH}px`;
 		canvas.style.height = `${BASE_DISPLAY_HEIGHT}px`;
 		canvas.style.imageRendering = "pixelated";
-
 		// Disable smoothing
 		context.imageSmoothingEnabled = false;
+		return context;
+	}, []);
+
+	useEffect(() => {
+		const canvas = canvasRef.current;
+		if (!canvas) return;
+
+		const context = configureCanvas(canvas);
+		if (!context) return;
 
 		// Clear the entire canvas
 		context.fillStyle = "rgba(0,0,0,0.1)";
@@ -97,47 +109,51 @@ export default memo(function Screen() {
 				drawCell(context, colIdx, rowIdx, cell.color);
 			}
 		}
+	}, [grid, drawCell, configureCanvas]);
 
-		// Handle cursor animation
+	useEffect(() => {
+		const canvas = cursorCanvasRef.current;
+		if (!canvas) return;
+
+		const context = configureCanvas(canvas);
+		if (!context) return;
+
+		if (!cursor?.display) {
+			return context.clearRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
+		}
+
 		let startTime;
-
 		const animate = (timestamp) => {
 			if (!startTime) startTime = timestamp;
-			const elapsedTime = timestamp - startTime;
-			const blinkState = Math.floor(elapsedTime / 500) % 2 === 0;
 
-			cursor?.cells?.forEach((row, rowIdx) => {
-				row.forEach((cell, colIdx) => {
-					if (!cell) return;
-
-					const gRow = (cursor.row + rowIdx) % rows;
-					const gCol = (cursor.col + colIdx) % columns;
-					const gridCell = grid[gRow]?.[gCol];
-
-					if (!gridCell) return;
-
-					drawCell(
-						context,
-						gCol,
-						gRow,
-						blinkState ? 1 : gridCell.color
-					);
-				});
+			context.clearRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
+			handleGameCursor({
+				context,
+				cursor,
+				rows,
+				columns,
+				elapsedTime: timestamp - startTime,
+				drawCell,
 			});
 
 			requestIdRef.current = requestAnimationFrame(animate);
 		};
 
-		if (cursor?.display) {
+		if (isCursorAnimated) {
 			requestIdRef.current = requestAnimationFrame(animate);
+		} else {
+			// Static render, just call once
+			handleGameCursor({
+				context,
+				cursor,
+				rows,
+				columns,
+				drawCell,
+			});
 		}
 
-		return () => {
-			if (requestIdRef.current) {
-				cancelAnimationFrame(requestIdRef.current);
-			}
-		};
-	}, [grid, cursor, drawCell]);
+		return () => cancelAnimationFrame(requestIdRef.current);
+	}, [cursor, handleGameCursor, isCursorAnimated, drawCell, configureCanvas]);
 
 	return (
 		<div
@@ -151,6 +167,17 @@ export default memo(function Screen() {
 			}}
 		>
 			<canvas ref={canvasRef} onClick={handleCanvasClick} />
+			<canvas
+				ref={cursorCanvasRef}
+				style={{
+					position: "absolute",
+					top: 0,
+					left: 0,
+					width: BASE_DISPLAY_WIDTH,
+					height: BASE_DISPLAY_HEIGHT,
+					pointerEvents: "none",
+				}}
+			/>
 		</div>
 	);
 });

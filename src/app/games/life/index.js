@@ -379,6 +379,26 @@ export default memo(function Life({
 		[patternTypeIdx, specificPatternIdx, setCursor]
 	);
 
+	const handleGameCursor = useCallback(
+		({ elapsedTime, context, cursor, drawCell, rows, columns }) => {
+			const blinkState = Math.floor(elapsedTime / 500) % 2 === 0;
+
+			if (!blinkState) return;
+
+			cursor?.cells?.forEach((row, rowIdx) => {
+				row.forEach((cell, colIdx) => {
+					if (!cell) return;
+					const gRow = (cursor.row + rowIdx) % rows;
+					const gCol = (cursor.col + colIdx) % columns;
+
+					drawCell(context, gCol, gRow, 1);
+				});
+			});
+		},
+		[]
+	);
+	handleGameCursor.animated = true;
+
 	const handleGameDpad = useCallback(
 		(r, c) => {
 			if (running) return;
@@ -597,6 +617,8 @@ export default memo(function Life({
 			loadGame,
 			resetGame,
 			runGame,
+			handleGameCursor,
+			isCursorAnimated: true,
 			handleGameDpad,
 			handleGameAction,
 			handleGameSelect,
@@ -609,6 +631,7 @@ export default memo(function Life({
 		loadGame,
 		resetGame,
 		runGame,
+		handleGameCursor,
 		handleGameDpad,
 		handleGameAction,
 		handleGameSelect,
