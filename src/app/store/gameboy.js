@@ -19,6 +19,7 @@ const initialState = {
 	cursor: null,
 	running: false,
 	pak: null,
+	initializing: false,
 	// bricked: false,
 	gameState: EmptyPak,
 };
@@ -26,6 +27,7 @@ export const useGameBoyStore = create(
 	devtools(
 		subscribeWithSelector((set, get) => ({
 			...initialState,
+			setInitializing: createStateUpdater("initializing")(set),
 			setPowerStatus: createStateUpdater("powerStatus")(set),
 			game: "",
 			setGame: createStateUpdater("game")(set),

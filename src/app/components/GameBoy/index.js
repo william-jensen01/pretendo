@@ -7,6 +7,7 @@ import VolumeWheel from "@/app/components/GameBoy/VolumeWheel";
 import Screen from "@/app/components/GameBoy/Screen";
 import ActionButtons from "@/app/components/GameBoy/ActionButtons";
 import Dpad from "@/app/components/GameBoy/Dpad";
+import Options from "@/app/components/GameBoy/OptionButtons";
 import {
 	create2dArray,
 	createPointerEvent,
@@ -14,6 +15,7 @@ import {
 	continuouslyAnimate,
 } from "@/app/util/helper";
 import { useGameBoyStore } from "@/app/store/gameboy";
+import { useInputStore } from "@/app/store/input";
 import { useShallow } from "zustand/react/shallow";
 import GamePak from "@/app/components/GamePak";
 import { useDroppable } from "@dnd-kit/core";
@@ -37,6 +39,8 @@ export default function GameBoy({ dragging, pageRef }) {
 		bricked,
 		setZoom,
 		resetGameBoy,
+		initializing,
+		setInitializing,
 	} = useGameBoyStore(
 		useShallow((state) => ({
 			powerStatus: state.powerStatus,
@@ -53,11 +57,13 @@ export default function GameBoy({ dragging, pageRef }) {
 			bricked: state.bricked,
 			setZoom: state.setZoom,
 			resetGameBoy: state.reset,
+			initializing: state.initializing,
+			setInitializing: state.setInitializing,
 		}))
 	);
-
-	const [clickOrder, setClickOrder] = useState([]);
-	const [clickTimer, setClickTimer] = useState(null);
+	const handleGameDpad = useGameBoyStore(
+		(state) => state.gameState.handleGameDpad
+	);
 
 	const [playStartup] = useSound("/audio/startup.wav", {
 		volume: 0.5,
@@ -76,20 +82,22 @@ export default function GameBoy({ dragging, pageRef }) {
 
 	const powerButtonRef = useRef(null);
 	const runningRef = useRef(running);
-	const clickTimerRef = useRef(clickTimer);
 	const powerStatusRef = useRef(powerStatus);
 	const stopAnimationRef = useRef();
 	const initializingRef = useRef();
 	const gameStateRef = useRef(gameState);
 	gameStateRef.current = gameState;
 
+	const lastNewPressTimeRef = useRef(0);
+	const delayActiveRef = useRef(false);
+	const delayTimersRef = useRef({});
+	const buttonDelaysRef = useRef({}); // { buttonId: expiryTimestamp }
+
 	const { setNodeRef, isOver } = useDroppable({
 		id: "pak-slot",
 	});
 
 	// const test = usePak(game, pak, powerStatusRef, runningRef, stopAnimationRef);
-
-	clickTimerRef.current = !!clickTimer;
 
 	// directionRef.current = direction;
 	// appleRef.current = apple;
@@ -208,8 +216,11 @@ export default function GameBoy({ dragging, pageRef }) {
 			};
 
 			const { animate, stop } = continuouslyAnimate(
+				"pretendo",
 				runningRef,
-				operation
+				operation,
+				0,
+				60
 			);
 
 			stopAnimationRef.current = stop;
@@ -224,6 +235,7 @@ export default function GameBoy({ dragging, pageRef }) {
 		// Not setting "running" state as this will result in "START" to display "STOP"
 		// we still want to prevent other actions from running while console is turning on
 		initializingRef.current = true;
+		setInitializing(true);
 		// runningRef.current = true;
 
 		// if fallDownToCenter is finished before game pak is initialized, wait for it to finish, then reset grid and load game
@@ -259,6 +271,7 @@ export default function GameBoy({ dragging, pageRef }) {
 		await delay(DURATIONS.WELCOME_LOAD_GAME);
 
 		initializingRef.current = false;
+		setInitializing(false);
 		gameStateRef.current.loadGame();
 	}
 
@@ -462,121 +475,87 @@ export default function GameBoy({ dragging, pageRef }) {
 		[]
 	);
 
-	const resetClickOrder = useCallback(() => {
-		setClickOrder([]);
-		if (clickTimer) {
-			clearTimeout(clickTimer);
-			setClickTimer(null);
-		}
-	}, [clickTimer]);
+	const handleFrameUpdate = useCallback(async () => {
+		const { pressedButtons, getNewPresses, updatePreviousFrame } =
+			useInputStore.getState();
+		const newPresses = getNewPresses();
+		const now = Date.now();
 
-	const checkClickOrder = useCallback((currentOrder, correctOrder) => {
-		if (currentOrder.length !== correctOrder.length) return false;
-		for (let i = 0; i < currentOrder.length; i++) {
-			if (currentOrder[i] !== correctOrder[i]) return false;
-		}
-		return true;
-	}, []);
-
-	const handleClickEE = useCallback(
-		(e, callback = () => null) => {
-			// e.preventDefault();
-
-			const id = e.currentTarget?.id || e.target?.id;
-			const updatedClickOrder = [...clickOrder, id];
-			setClickOrder(updatedClickOrder);
-			if (clickTimer) {
-				clearTimeout(clickTimer);
-				setClickTimer(null);
-			}
-
-			if (
-				updatedClickOrder.length === 2 &&
-				updatedClickOrder[0] === "select" &&
-				updatedClickOrder[1] === "start"
-			) {
-			} else {
-				callback();
-			}
-
-			setClickTimer(
-				setTimeout(() => {
-					// Handle game ee/shortcuts
-					const shortcuts =
-						gameStateRef.current.handleGameEEShortcuts;
-					if (shortcuts.length > 0) {
-						shortcuts.forEach(([sequence, callback]) => {
-							if (checkClickOrder(updatedClickOrder, sequence)) {
-								callback(resetClickOrder, e);
-							}
-						});
-					}
-
-					resetClickOrder();
-					setClickTimer(null);
-				}, 500)
-			);
-		},
-		[clickOrder, clickTimer, resetClickOrder, checkClickOrder]
-	);
-
-	useEffect(() => {
-		return () => {
-			if (clickTimer) clearTimeout(clickTimer);
-		};
-	}, [clickTimer]);
-
-	const handleDpad = useCallback(
-		(e) => {
-			const id = e.currentTarget?.id ?? e.target?.id;
-			if (!id) return;
-			const directionLookup = {
+		// Helper: convert button to delta coords
+		const buttonToDelta = (btn) => {
+			const lookup = {
 				up: [-1, 0],
 				down: [1, 0],
-				right: [0, 1],
 				left: [0, -1],
+				right: [0, 1],
 			};
-			if (
-				!directionLookup.hasOwnProperty(id) ||
-				!powerStatus ||
-				!game ||
-				bricked ||
-				initializingRef.current
-			) {
-				return;
-			}
+			if (!lookup.hasOwnProperty(btn)) return [0, 0];
+			return lookup[btn];
+		};
 
-			const [r, c] = directionLookup[id];
-			handleClickEE(e, () => gameStateRef.current.handleGameDpad(r, c));
-		},
-		[powerStatus, game, bricked, handleClickEE]
-	);
+		// Helper: calculate movement delta from button list
+		const getDelta = (buttons) => {
+			let deltaR = 0,
+				deltaC = 0;
+			buttons.forEach((btn) => {
+				const [r, c] = buttonToDelta(btn);
+				deltaR += r;
+				deltaC += c;
+			});
+			return [deltaR, deltaC];
+		};
 
-	const handleAction = (e) => {
-		if (!powerStatus || !game || bricked || initializingRef.current) return;
-		handleClickEE(e, () => {
-			gameStateRef.current.handleGameAction(e);
+		// NEW PRESSES - process once, start delays
+		if (newPresses.length > 0) {
+			const [deltaR, deltaC] = getDelta(newPresses);
+
+			// Convert new presses to delta coords
+			const newPressDeltas = newPresses.map(buttonToDelta);
+
+			// Start delay for each new d-pad button
+			newPresses.forEach((btn) => {
+				if (["up", "down", "left", "right"].includes(btn)) {
+					buttonDelaysRef.current[btn] = now + 100;
+				}
+			});
+
+			if (deltaR || deltaC)
+				handleGameDpad(deltaR, deltaC, newPressDeltas, false);
+			updatePreviousFrame();
+			return true;
+		}
+
+		// HELD BUTTONS - only include buttons past their delay
+		const activeButtons = Array.from(pressedButtons).filter((btn) => {
+			const expiry = buttonDelaysRef.current[btn];
+			return !expiry || now >= expiry;
 		});
-	};
-	const handleSelect = (e) => {
-		if (!powerStatus || !game || bricked || initializingRef.current) return;
-		// playClick();
-		handleClickEE(e, () => {
-			gameStateRef.current.handleGameSelect(e);
-		});
-	};
-	const handleStart = (e) => {
-		if (!powerStatus || !game || bricked || initializingRef.current) return;
 
-		handleClickEE(e, () => {
-			// playStart();
+		const [deltaR, deltaC] = getDelta(activeButtons);
+		const activeDeltas = activeButtons.map(buttonToDelta);
 
-			gameStateRef.current.handleGameStart();
+		if (deltaR || deltaC)
+			handleGameDpad(deltaR, deltaC, activeDeltas, true);
 
-			// changeRunning(!running);
-			// gameState.runGame(runOnceRef.current);
-		});
-	};
+		return true;
+	}, [handleGameDpad]);
+
+	useEffect(() => {
+		if (initializing || !powerStatus) return;
+
+		const { animate, stop } = continuouslyAnimate(
+			"frameUpdate",
+			powerStatusRef,
+			handleFrameUpdate,
+			0,
+			60
+		);
+		animate();
+
+		return () => {
+			stop();
+		};
+	}, [handleFrameUpdate, continuouslyAnimate, initializing, powerStatus]);
 
 	return (
 		<div id="container">
@@ -659,25 +638,9 @@ export default function GameBoy({ dragging, pageRef }) {
 					<span className={Gill.className}>GAME BOY</span>
 					<sub className={Gill.className}>TM</sub>
 				</div>
-				<Dpad
-					handleDpad={handleDpad}
-					powerStatus={powerStatus}
-					running={running}
-				/>
-				<ActionButtons handleAction={handleAction} />
-				<div id="options">
-					<div className="container">
-						<button id="select" onClick={handleSelect}></button>
-						<div className={`label ${NES.className}`}>SELECT</div>
-					</div>
-
-					<div className="container">
-						<button id="start" onClick={handleStart}></button>
-						<div className={`label ${NES.className}`}>
-							{running ? "STOP" : "START"}
-						</div>
-					</div>
-				</div>
+				<Dpad />
+				<ActionButtons />
+				<Options />
 
 				<div id="speaker">
 					<div>

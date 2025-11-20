@@ -11,6 +11,7 @@ import {
 import Cell from "@/app/Cell";
 import * as presets from "@/app/presets";
 import { useGameBoyStore } from "@/app/store/gameboy";
+import { useClickSequenceDetection } from "@/app/util/useClickSequenceDetection";
 import { useShallow } from "zustand/react/shallow";
 import useSound from "@/app/util/useSound";
 
@@ -27,8 +28,9 @@ const initialCursor = {
 	),
 	col: Math.floor(
 		columns / 2 -
-			presets.patterns[initialPatternTypeIdx][initialSpecificPatternIdx][0]
-				.length /
+			presets.patterns[initialPatternTypeIdx][
+				initialSpecificPatternIdx
+			][0].length /
 				2
 	),
 	cluster: 1,
@@ -72,6 +74,7 @@ export default memo(function Life({
 		setGameState,
 		setMessage,
 		unlockEasterEgg,
+		initializing,
 	} = useGameBoyStore(
 		useShallow((state) => ({
 			setGrid: state.setGrid,
@@ -83,6 +86,7 @@ export default memo(function Life({
 			setGameState: state.setGameState,
 			setMessage: state.setMessage,
 			unlockEasterEgg: state.unlockEasterEgg,
+			initializing: state.initializing,
 		}))
 	);
 	const [evolutions, setEvolutions] = useState(0);
@@ -124,7 +128,11 @@ export default memo(function Life({
 					if (cell.color !== 0) {
 						// columns.push((colIdx += cell.color));
 						columns.push(
-							parseInt(colIdx + `${cell.vital_status}` + `${cell.color}`)
+							parseInt(
+								colIdx +
+									`${cell.vital_status}` +
+									`${cell.color}`
+							)
 						);
 					}
 				});
@@ -288,7 +296,10 @@ export default memo(function Life({
 									vital_changed: true,
 									color: 2,
 								});
-							} else if (state === 1 && (neighbors < 2 || neighbors > 3)) {
+							} else if (
+								state === 1 &&
+								(neighbors < 2 || neighbors > 3)
+							) {
 								ng[i][j] = new Cell({
 									vital_value: 0,
 									vital_changed: true,
@@ -296,12 +307,19 @@ export default memo(function Life({
 								});
 							} else {
 								let updatedGeneration = cell.generations_lived;
-								if (cell.vital_status && cell.generations_lived > 0) {
+								if (
+									cell.vital_status &&
+									cell.generations_lived > 0
+								) {
 									updatedGeneration++;
 								}
 								let updatedColor = 0;
-								if (cell.vital_status) updatedColor = pg[i][j].color;
-								if (cell.vital_status && updatedGeneration > 2) {
+								if (cell.vital_status)
+									updatedColor = pg[i][j].color;
+								if (
+									cell.vital_status &&
+									updatedGeneration > 2
+								) {
 									updatedColor = 3;
 								}
 
@@ -313,7 +331,11 @@ export default memo(function Life({
 									color: updatedColor,
 								});
 							}
-							if (JSON.stringify(pg[i][j] !== JSON.stringify(ng[i][j]))) {
+							if (
+								JSON.stringify(
+									pg[i][j] !== JSON.stringify(ng[i][j])
+								)
+							) {
 								mismatches.push(j);
 							}
 						}
@@ -342,6 +364,7 @@ export default memo(function Life({
 				changeRunning(false);
 			} else {
 				const { animate, stop } = continuouslyAnimate(
+					"life",
 					// powerStatusRef,
 					runningRef,
 					simulate
@@ -363,7 +386,9 @@ export default memo(function Life({
 				(patternTypeIdx + t + patterns.length) % patterns.length;
 			const newValueS =
 				newValueT === patternTypeIdx
-					? (specificPatternIdx + s + patterns[patternTypeIdx].length) %
+					? (specificPatternIdx +
+							s +
+							patterns[patternTypeIdx].length) %
 					  patterns[patternTypeIdx].length
 					: 0;
 
@@ -397,7 +422,6 @@ export default memo(function Life({
 		},
 		[]
 	);
-	handleGameCursor.animated = true;
 
 	const handleGameDpad = useCallback(
 		(r, c) => {
@@ -574,7 +598,11 @@ export default memo(function Life({
 						return {
 							...prev,
 							cluster: prev.cluster + 1,
-							cells: presets.expandCell(prev.cells, 1, prev.cluster),
+							cells: presets.expandCell(
+								prev.cells,
+								1,
+								prev.cluster
+							),
 						};
 					});
 					resetClickOrder();
@@ -591,7 +619,11 @@ export default memo(function Life({
 							cluster: newClusterSize,
 
 							// we want n to actually be -1 so it actually decreases in size instead of getting bigger by new n
-							cells: presets.expandCell(prev.cells, -1, prev.cluster),
+							cells: presets.expandCell(
+								prev.cells,
+								-1,
+								prev.cluster
+							),
 						};
 					});
 					resetClickOrder();
@@ -611,6 +643,8 @@ export default memo(function Life({
 		]
 	);
 
+	useClickSequenceDetection(handleGameEEShortcuts);
+
 	useEffect(() => {
 		setGameState({
 			name: "life",
@@ -624,7 +658,6 @@ export default memo(function Life({
 			handleGameSelect,
 			handleGameStart,
 			handleGameCellClick,
-			handleGameEEShortcuts,
 		});
 	}, [
 		setGameState,
@@ -637,6 +670,5 @@ export default memo(function Life({
 		handleGameSelect,
 		handleGameStart,
 		handleGameCellClick,
-		handleGameEEShortcuts,
 	]);
 });

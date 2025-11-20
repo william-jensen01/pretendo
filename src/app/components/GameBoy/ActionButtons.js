@@ -1,10 +1,27 @@
-import { useEffect, useState, useRef, memo } from "react";
+import { useRef, memo } from "react";
+import { useInputStore } from "@/app/store/input";
+import { useGameBoyStore } from "@/app/store/gameboy";
 import useSound from "@/app/util/useSound";
-import { delay } from "@/app/util/helper";
-
 import { NES } from "@/app/fonts";
 
-export default memo(function ActionButtons({ handleAction }) {
+export default memo(function ActionButtons() {
+	const {
+		isNewPress,
+		addPressedButton,
+		removePressedButton,
+		addToSequence,
+		updatePreviousFrame,
+		getPressedArray,
+	} = useInputStore();
+
+	const powerStatus = useGameBoyStore((state) => state.powerStatus);
+	const game = useGameBoyStore((state) => state.game);
+	const bricked = useGameBoyStore((state) => state.bricekd);
+	const initializing = useGameBoyStore((state) => state.initializing);
+	const handleGameAction = useGameBoyStore(
+		(state) => state.gameState.handleGameAction
+	);
+
 	const buttonRef = useRef();
 
 	const [playSound] = useSound("/audio/action/short.m4a", {
@@ -16,18 +33,49 @@ export default memo(function ActionButtons({ handleAction }) {
 		},
 	});
 
+	const isWorking = powerStatus && game && !bricked && !initializing;
+
 	const handleHolding = async (e) => {
-		buttonRef.current = e.currentTarget;
+		e.preventDefault();
+		const currentTarget = e.currentTarget || e.target;
+		buttonRef.current = currentTarget;
 		playSound({ id: "press" });
-		const event = { ...e };
-		// await delay(146);
-		handleAction(event);
+
+		console.log("currentTarget", currentTarget);
+		const id = currentTarget?.id;
+		if (!id) return;
+		// Add to pressed buttons
+		addPressedButton(id);
+		// Register to click sequence only on new press
+		if (isNewPress(id)) {
+			addToSequence(id);
+		}
+
+		// Get current pressed buttons
+		const allPressed = getPressedArray();
+		// Create event with all pressed buttons
+		const event = {
+			...e,
+			pressedButtons: allPressed,
+			currentTarget,
+		};
+		// Only call game action if console is working properly
+		if (isWorking) handleGameAction(event);
 	};
 
 	const handleLifting = async (e) => {
-		if (!buttonRef.current) return;
-		playSound({ id: "release" });
+		// Only play sound if button is pressed
+		if (buttonRef.current) {
+			playSound({ id: "release" });
+		}
 		buttonRef.current = undefined;
+
+		const id = e.currentTarget?.id || e.target.id;
+		if (!id) return;
+		// Remove from pressed buttons
+		removePressedButton(id);
+		// Update previous frame tracking
+		updatePreviousFrame();
 	};
 
 	return (

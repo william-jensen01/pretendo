@@ -840,7 +840,7 @@ button.credits {
 } */
 
 #dpad button::before {
-	cursor: default;
+	cursor: pointer;
 }
 #dpad button::before,
 #dpad button::after {
@@ -864,8 +864,8 @@ button.credits {
 	right: calc(-6px - 0px);
 }
 #up::before {
-	top: calc(-7px - 17px);
-	width: 200%;
+	top: calc(-7px - 17px - 10px);
+	width: 225%;
 	bottom: 50%;
 }
 #dpad #left {
@@ -881,8 +881,8 @@ button.credits {
 	bottom: -6px;
 }
 #left::before {
-	height: 200%;
-	left: calc(-6px - 17px);
+	height: 225%;
+	left: calc(-6px - 17px - 10px);
 	right: 50%;
 }
 #dpad #right {
@@ -898,8 +898,8 @@ button.credits {
 	bottom: -6px;
 }
 #right::before {
-	height: 200%;
-	right: calc(-6px - 17px);
+	height: 225%;
+	right: calc(-6px - 17px - 10px);
 	left: 50%;
 }
 #dpad #down {
@@ -915,8 +915,8 @@ button.credits {
 	right: -6px;
 }
 #down::before {
-	width: 200%;
-	bottom: calc(-4px - 17px);
+	width: 225%;
+	bottom: calc(-4px - 17px - 10px);
 	top: 50%;
 }
 #dpad .axis button {

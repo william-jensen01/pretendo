@@ -1,6 +1,13 @@
 import { rows, columns } from "@/app/constants";
 import Cell from "@/app/Cell";
-import { useGameBoyStore } from "../store/gameboy";
+
+export const checkClickOrder = (clickOrder, correctOrder) => {
+	if (clickOrder.length !== correctOrder.length) return false;
+	for (let i = 0; i < clickOrder.length; i++) {
+		if (clickOrder[i] !== correctOrder[i]) return false;
+	}
+	return true;
+};
 
 export function delay(ms) {
 	return new Promise((res) => setTimeout(res, ms));
@@ -90,32 +97,51 @@ export function compare2dArray(oldArr, newArr) {
 	return result;
 }
 
-export function continuouslyAnimate(runningRef, callback, delayAmount = 0) {
-	console.log("inside continuouslyAnimate creation");
+export function continuouslyAnimate(
+	name,
+	runningRef,
+	callback,
+	delayAmount,
+	fps
+) {
+	console.log(name, ":: inside continuouslyAnimate creation");
+	// Determine target delay
+	// delayAmount overrides fps
+	// If neither provided, go as fast as possible
+	let targetDelay = 0;
+	if (delayAmount) {
+		targetDelay = delayAmount;
+	} else if (fps) {
+		targetDelay = 1000 / fps; // e.g., 60fps = 16.67ms per frame
+	}
+	// else targetDelay = 0 (go as fast as possible)
 
 	let animationFrameId = null;
 	let isStopped = false;
 
-	const animate = async () => {
+	const animate = async (prevCallbackTime = 0) => {
 		if (isStopped || !runningRef.current) {
 			cancelAnimationFrame(animationFrameId);
 			isStopped = false;
 			return;
 		}
 
-		const start = performance.now();
-
-		let shouldContinue = callback();
-
-		const end = performance.now();
-		const executionTime = end - start;
-
-		if (delayAmount && executionTime < delayAmount) {
-			const difference = delayAmount - executionTime;
-			await delay(difference);
+		// Only delay if target delay is set
+		if (targetDelay > 0) {
+			const delayTime = Math.max(0, targetDelay - prevCallbackTime);
+			if (delayTime > 0) {
+				await delay(delayTime);
+			}
 		}
+
+		const start = performance.now();
+		let shouldContinue = await callback();
+		const executionTime = performance.now() - start;
+
 		if (shouldContinue && !isStopped) {
-			animationFrameId = requestAnimationFrame(animate);
+			animationFrameId = requestAnimationFrame(() =>
+				animate(executionTime)
+			);
 		} else {
 			cancelAnimationFrame(animationFrameId);
 			animationFrameId = null;

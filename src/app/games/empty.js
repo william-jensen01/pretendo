@@ -14,7 +14,6 @@ const EmptyPak = {
 	handleGameCellClick: (e, g, r, c) => {
 		console.log(g[r][c], "\nrow", r, ":", g[r]);
 	},
-	handleGameEEShortcuts: () => [],
 	handleGameEEDpad: () => {},
 	handleGameEEAction: () => {},
 	credits: [],

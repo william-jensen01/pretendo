@@ -18,6 +18,7 @@ export default memo(function Screen() {
 	const canvasRef = useRef(null);
 	const cursorCanvasRef = useRef(null);
 	const requestIdRef = useRef(null);
+	const startTimeRef = useRef(null);
 	const grid = useGameBoyStore((state) => state.grid);
 	const cursor = useGameBoyStore((state) => state.cursor);
 	const handleGameCursor = useGameBoyStore(
@@ -119,12 +120,14 @@ export default memo(function Screen() {
 		if (!context) return;
 
 		if (!cursor?.display) {
+			startTimeRef.current = null;
 			return context.clearRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
 		}
 
-		let startTime;
+		startTimeRef.current = 0;
+
 		const animate = (timestamp) => {
-			if (!startTime) startTime = timestamp;
+			if (!startTimeRef.current) startTimeRef.current = timestamp;
 
 			context.clearRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
 			handleGameCursor({
@@ -132,7 +135,7 @@ export default memo(function Screen() {
 				cursor,
 				rows,
 				columns,
-				elapsedTime: timestamp - startTime,
+				elapsedTime: timestamp - startTimeRef.current,
 				drawCell,
 			});
 
@@ -143,6 +146,7 @@ export default memo(function Screen() {
 			requestIdRef.current = requestAnimationFrame(animate);
 		} else {
 			// Static render, just call once
+			startTimeRef.current = null;
 			handleGameCursor({
 				context,
 				cursor,

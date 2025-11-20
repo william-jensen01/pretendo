@@ -73,6 +73,9 @@ export function determineSnakeEyes(head, directionArr) {
 			[topLeftRow, bottomRightCol],
 			[bottomRightRow, bottomRightCol],
 		];
+	} else {
+		// same head
+		return head;
 	}
 }
 
@@ -83,7 +86,9 @@ export function createApple(snake = initialSnake) {
 			.map((empty, idx) => idx + from)
 			.filter((number) => !without.includes(number));
 
-		return allowedNumbers[Math.floor(Math.random() * allowedNumbers.length)];
+		return allowedNumbers[
+			Math.floor(Math.random() * allowedNumbers.length)
+		];
 	};
 
 	const doesSegmentIntersectSnake = (topLeft, bottomRight) => {
@@ -241,7 +246,9 @@ export default function Snake({
 				for (let col = snake[i][0][1]; col <= snake[i][1][1]; col++) {
 					ng[row][col] = new Cell({
 						vital_value: 1,
-						color: eyes.some(([r, c]) => r === row && c === col) ? 3 : 2,
+						color: eyes.some(([r, c]) => r === row && c === col)
+							? 3
+							: 2,
 					});
 				}
 			}
@@ -386,8 +393,16 @@ export default function Snake({
 		const currentApple = appleRef.current;
 		setGrid((pg) => {
 			const ng = pg.map((row) => [...row]);
-			for (let row = currentApple[0][0]; row <= currentApple[1][0]; row++) {
-				for (let col = currentApple[0][1]; col <= currentApple[1][1]; col++) {
+			for (
+				let row = currentApple[0][0];
+				row <= currentApple[1][0];
+				row++
+			) {
+				for (
+					let col = currentApple[0][1];
+					col <= currentApple[1][1];
+					col++
+				) {
 					const color = gameOverGrid[row][col]?.color;
 					ng[row][col] = new Cell({
 						vital_value: 0,
@@ -499,6 +514,7 @@ export default function Snake({
 			};
 
 			const { animate, stop } = continuouslyAnimate(
+				"snake",
 				// powerStatusRef,
 				runningRef,
 				snek,
@@ -511,13 +527,12 @@ export default function Snake({
 		[gameOver, playSound, snake, apple]
 	);
 
-	const handleGameEEShortcuts = useMemo(() => {
-		return [];
-	}, []);
-
 	const handleGameDpad = useCallback(
-		(r = 0, c = 0) => {
-			if (!running) return;
+		(r = 0, c = 0, _, isHeld) => {
+			if (!running || isHeld) return;
+
+			// r and c are cumulative of current pressed buttons, could lead to diagnol movement
+
 			changeDirection([r * SNAKE_SIZE, c * SNAKE_SIZE]);
 		},
 		[running]
@@ -560,7 +575,6 @@ export default function Snake({
 			handleGameSelect,
 			handleGameStart,
 			handleGameCellClick,
-			handleGameEEShortcuts,
 		});
 	}, [
 		setGameState,
@@ -572,7 +586,6 @@ export default function Snake({
 		handleGameSelect,
 		handleGameStart,
 		handleGameCellClick,
-		handleGameEEShortcuts,
 	]);
 
 	return "";
