@@ -19,6 +19,8 @@ export const COORDINATE_SIZE = COORDINATE_CHAR_SIZE + 1;
 export const BOARD_MARGIN = 8; // except bottom
 export const BOARD_OFFSET = BOARD_MARGIN + COORDINATE_SIZE;
 
+export const NUM_FILES = 8;
+export const NUM_RANKS = 8;
 export const DEFAULT_BOARD = [
 	["r", "n", "b", "q", "k", "b", "n", "r"], // Black back rank
 	["p", "p", "p", "p", "p", "p", "p", "p"], // Black pawns
