@@ -8,8 +8,10 @@ import {
 	COORDINATE_SIZE,
 	HORIZONTAL_AXIS,
 	VERTICAL_AXIS,
+	NUM_RANKS,
 } from "./constants";
 import * as presets from "./presets";
+import { useGameBoyStore } from "@/app/store/gameboy";
 
 export const createStaticChessGrid = () => {
 	const grid = create2dArray();
@@ -68,7 +70,35 @@ export const createStaticChessGrid = () => {
 	return grid;
 };
 
-export const renderBoardPieces = (board, staticGrid) => {
+export const renderSquareHighlight = (staticGrid, gRow, gCol, color, what) => {
+	const highlightColor = color === 0 ? 2 : 1;
+	const thickness = 2;
+	const padding = 2;
+	const start = padding;
+	const end = SQUARE_SIZE - padding;
+
+	const set = (r, c) => {
+		staticGrid[r][c] = new Cell({ color: highlightColor });
+	};
+
+	for (let offset = 0; offset < thickness; offset++) {
+		// top border
+		for (let x = start; x < end; x++) set(gRow + start + offset, gCol + x);
+
+		// bottom border
+		for (let x = start; x < end; x++)
+			set(gRow + end - 1 - offset, gCol + x);
+
+		// left border
+		for (let y = start; y < end; y++) set(gRow + y, gCol + start + offset);
+
+		// right border
+		for (let y = start; y < end; y++)
+			set(gRow + y, gCol + end - 1 - offset);
+	}
+};
+
+export const renderBoardPieces = (board, staticGrid, selectedSquare) => {
 	const loopPiece = (piece, [rOffset, cOffset] = [0, 0]) => {
 		for (let r = 0; r < piece.length; r++) {
 			for (let c = 0; c < piece[r].length; c++) {
@@ -85,13 +115,86 @@ export const renderBoardPieces = (board, staticGrid) => {
 	};
 
 	board.forEach((rankRow, rankIdx) => {
-		rankRow.forEach((pieceSymbol, fileIdx) => {
+		rankRow.forEach((piece, fileIdx) => {
+			if (!piece) return;
+
 			const gCol = fileIdx * SQUARE_SIZE + BOARD_OFFSET;
 			const gRow = rankIdx * SQUARE_SIZE + BOARD_OFFSET;
-			// 4. Render Game Pieces
-			const pieceArr = presets.getPiece(pieceSymbol);
-			if (!pieceArr) return;
-			loopPiece(pieceArr, [gRow, gCol]);
+			const squareColor = (rankIdx + fileIdx) % 2 === 0 ? 0 : 3;
+
+			if (
+				selectedSquare &&
+				selectedSquare.row === rankIdx &&
+				selectedSquare.col === fileIdx
+			) {
+				// Draw selection indicator
+				renderSquareHighlight(
+					staticGrid,
+					gRow,
+					gCol,
+					squareColor,
+					"selected"
+				);
+				return;
+			}
+
+			// Render piece if it exists and isn't selected
+			const pieceArr = presets.getPiece(piece);
+			if (pieceArr) loopPiece(pieceArr, [gRow, gCol]);
 		});
 	});
+};
+
+export const createBoard = (board) => {
+	return board.map((row) => row.map((piece) => piece));
+};
+
+export const getHoveredSquare = (board) => {
+	const cursor = useGameBoyStore.getState().cursor;
+	const cursorRowStart = cursor.row;
+	const cursorRowEnd = cursor.row + cursor.cells.length;
+	const cursorColStart = cursor.col;
+	const cursorColEnd = cursor.col + cursor.cells[0].length;
+
+	let bestSquare = null;
+	let bestArea = 0;
+	board.forEach((rankRow, rIdx) => {
+		rankRow.forEach((piece, fIdx) => {
+			const sRowStart = rIdx * SQUARE_SIZE + BOARD_OFFSET;
+			const sRowEnd = sRowStart + SQUARE_SIZE;
+			const sColStart = fIdx * SQUARE_SIZE + BOARD_OFFSET;
+			const sColEnd = sColStart + SQUARE_SIZE;
+
+			// compute overlap rectangle
+			const overlapRowStart = Math.max(cursorRowStart, sRowStart);
+			const overlapRowEnd = Math.min(cursorRowEnd, sRowEnd);
+
+			const overlapColStart = Math.max(cursorColStart, sColStart);
+			const overlapColEnd = Math.min(cursorColEnd, sColEnd);
+
+			const overlapWidth = overlapColEnd - overlapColStart;
+			const overlapHeight = overlapRowEnd - overlapRowStart;
+
+			if (overlapWidth > 0 && overlapHeight > 0) {
+				const area = overlapWidth * overlapHeight;
+
+				if (area > bestArea) {
+					bestArea = area;
+
+					// convert to chess notation
+					const file = HORIZONTAL_AXIS[fIdx];
+					const rank = NUM_RANKS - rIdx;
+					bestSquare = {
+						file,
+						rank,
+						row: rIdx,
+						col: fIdx,
+						piece,
+					};
+				}
+			}
+		});
+	});
+
+	return bestSquare;
 };
