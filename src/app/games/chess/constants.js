@@ -1,3 +1,6 @@
+import { Rook, Knight, Bishop, Queen, King, Pawn } from "./logic/pieces";
+import { Color } from "./logic/models";
+
 export const SQUARE_SIZE = 16;
 export const SQUARE_PADDING = 1;
 export const SQUARE_RENDER_SIZE = SQUARE_SIZE - SQUARE_PADDING * 2;
@@ -22,12 +25,48 @@ export const BOARD_OFFSET = BOARD_MARGIN + COORDINATE_SIZE;
 export const NUM_FILES = 8;
 export const NUM_RANKS = 8;
 export const DEFAULT_BOARD = [
-	["r", "n", "b", "q", "k", "b", "n", "r"], // Black back rank
-	["p", "p", "p", "p", "p", "p", "p", "p"], // Black pawns
+	[
+		new Rook(Color.Black),
+		new Knight(Color.Black),
+		new Bishop(Color.Black),
+		new Queen(Color.Black),
+		new King(Color.Black),
+		new Bishop(Color.Black),
+		new Knight(Color.Black),
+		new Rook(Color.Black),
+	], // Black back rank
+	[
+		new Pawn(Color.Black),
+		new Pawn(Color.Black),
+		new Pawn(Color.Black),
+		new Pawn(Color.Black),
+		new Pawn(Color.Black),
+		new Pawn(Color.Black),
+		new Pawn(Color.Black),
+		new Pawn(Color.Black),
+	], // Black pawns
 	[null, null, null, null, null, null, null, null],
 	[null, null, null, null, null, null, null, null],
 	[null, null, null, null, null, null, null, null],
 	[null, null, null, null, null, null, null, null],
-	["P", "P", "P", "P", "P", "P", "P", "P"], // White pawns
-	["R", "N", "B", "Q", "K", "B", "N", "R"], // White back rank
+	[
+		new Pawn(Color.White),
+		new Pawn(Color.White),
+		new Pawn(Color.White),
+		new Pawn(Color.White),
+		new Pawn(Color.White),
+		new Pawn(Color.White),
+		new Pawn(Color.White),
+		new Pawn(Color.White),
+	], // White pawns
+	[
+		new Rook(Color.White),
+		new Knight(Color.White),
+		new Bishop(Color.White),
+		new Queen(Color.White),
+		new King(Color.White),
+		new Bishop(Color.White),
+		new Knight(Color.White),
+		new Rook(Color.White),
+	], // Black back rank
 ];

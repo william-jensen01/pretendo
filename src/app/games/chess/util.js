@@ -9,9 +9,11 @@ import {
 	HORIZONTAL_AXIS,
 	VERTICAL_AXIS,
 	NUM_RANKS,
+	NUM_FILES,
 } from "./constants";
 import * as presets from "./presets";
 import { useGameBoyStore } from "@/app/store/gameboy";
+import { Pawn } from "./logic/pieces";
 
 export const createStaticChessGrid = () => {
 	const grid = create2dArray();
@@ -70,8 +72,9 @@ export const createStaticChessGrid = () => {
 	return grid;
 };
 
-export const renderSquareHighlight = (staticGrid, gRow, gCol, color, what) => {
-	const highlightColor = color === 0 ? 2 : 1;
+export const renderSquareHighlight = (staticGrid, gRow, gCol, what) => {
+	const highlightColor =
+		what === "selected" ? 2 : what === "possible" ? 1 : 0;
 	const thickness = 2;
 	const padding = 2;
 	const start = padding;
@@ -98,7 +101,12 @@ export const renderSquareHighlight = (staticGrid, gRow, gCol, color, what) => {
 	}
 };
 
-export const renderBoardPieces = (board, staticGrid, selectedSquare) => {
+export const renderBoardPieces = (
+	board,
+	staticGrid,
+	selectedSquare,
+	possibleMoves
+) => {
 	const loopPiece = (piece, [rOffset, cOffset] = [0, 0]) => {
 		for (let r = 0; r < piece.length; r++) {
 			for (let c = 0; c < piece[r].length; c++) {
@@ -120,7 +128,6 @@ export const renderBoardPieces = (board, staticGrid, selectedSquare) => {
 
 			const gCol = fileIdx * SQUARE_SIZE + BOARD_OFFSET;
 			const gRow = rankIdx * SQUARE_SIZE + BOARD_OFFSET;
-			const squareColor = (rankIdx + fileIdx) % 2 === 0 ? 0 : 3;
 
 			if (
 				selectedSquare &&
@@ -128,25 +135,29 @@ export const renderBoardPieces = (board, staticGrid, selectedSquare) => {
 				selectedSquare.col === fileIdx
 			) {
 				// Draw selection indicator
-				renderSquareHighlight(
-					staticGrid,
-					gRow,
-					gCol,
-					squareColor,
-					"selected"
-				);
+				renderSquareHighlight(staticGrid, gRow, gCol, "selected");
 				return;
 			}
 
 			// Render piece if it exists and isn't selected
-			const pieceArr = presets.getPiece(piece);
+			const pieceArr = presets.getPiece(piece.FENChar);
 			if (pieceArr) loopPiece(pieceArr, [gRow, gCol]);
 		});
 	});
+
+	if (possibleMoves && possibleMoves.length > 0) {
+		possibleMoves.forEach(({ row, col }) => {
+			const gCol = col * SQUARE_SIZE + BOARD_OFFSET;
+			const gRow = row * SQUARE_SIZE + BOARD_OFFSET;
+			renderSquareHighlight(staticGrid, gRow, gCol, "possible");
+		});
+	}
 };
 
-export const createBoard = (board) => {
-	return board.map((row) => row.map((piece) => piece));
+export const deepCopyBoard = (board) => {
+	return board.map((row) =>
+		row.map((piece) => (piece ? piece.clone() : null))
+	);
 };
 
 export const getHoveredSquare = (board) => {
@@ -197,4 +208,9 @@ export const getHoveredSquare = (board) => {
 	});
 
 	return bestSquare;
+};
+
+export const isValidMove = (piece, from, to, board, gameState) => {
+	// First check piece-specific rules
+	return piece.isValidMove(from, to, board, gameState);
 };

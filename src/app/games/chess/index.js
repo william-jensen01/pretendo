@@ -11,7 +11,8 @@ import {
 	createStaticChessGrid,
 	renderBoardPieces,
 	getHoveredSquare,
-	createBoard,
+	deepCopyBoard,
+	isValidMove,
 } from "./util";
 import * as presets from "./presets";
 import { useGameBoyStore } from "@/app/store/gameboy";
@@ -38,13 +39,14 @@ export default function Chess() {
 
 	const [board, setBoard] = useState(DEFAULT_BOARD);
 	const [selectedSquare, setSelectedSquare] = useState(null);
+	const [possibleMoves, setPossibleMoves] = useState([]);
 
 	// Compute grid based on board and state
 	const boardGrid = useMemo(() => {
 		const next = staticGridRef.current.map((row) => [...row]);
-		renderBoardPieces(board, next, selectedSquare);
+		renderBoardPieces(board, next, selectedSquare, possibleMoves);
 		return next;
-	}, [board, selectedSquare]);
+	}, [board, selectedSquare, possibleMoves]);
 
 	const loadGame = useCallback(() => {
 		setBoard(DEFAULT_BOARD);
@@ -93,6 +95,30 @@ export default function Chess() {
 		[setCursor]
 	);
 
+	const makeMove = useCallback(
+		(from, to) => {
+			const newBoard = deepCopyBoard(board);
+			const piece = newBoard[from.row][from.col];
+
+			newBoard[to.row][to.col] = piece;
+			newBoard[from.row][from.col] = null;
+
+			// Update hasMoved flag if piece has it
+			if (piece && piece.hasMoved !== undefined) {
+				piece.hasMoved = true;
+			}
+
+			setBoard(newBoard);
+			setSelectedSquare(null);
+			setPossibleMoves([]);
+			setCursor((prev) => ({
+				...prev,
+				cells: presets.cursor,
+			}));
+		},
+		[board]
+	);
+
 	const handleGameAction = useCallback(
 		(e) => {
 			if (e.currentTarget.id === "a") {
@@ -100,45 +126,58 @@ export default function Chess() {
 				const hoveredSquare = getHoveredSquare(board);
 				if (selectedSquare) {
 					// MAKING A MOVE / PLACING PIECE
+					const from = selectedSquare;
+					const to = hoveredSquare;
+					const piece = board[from.row][from.col];
 
-					// Todo: validate move with piece's rules
-
-					const newBoard = createBoard(board);
-					newBoard[selectedSquare.row][selectedSquare.col] = null;
-					newBoard[hoveredSquare.row][hoveredSquare.col] =
-						selectedSquare.piece;
-					setBoard(newBoard);
-					// reset selected square
-					setSelectedSquare(null);
-					// reset cursor
-					setCursor((prev) => ({
-						...prev,
-						cells: presets.cursor,
-					}));
-					return;
+					if (piece && isValidMove(piece, from, to, board)) {
+						makeMove(from, to);
+					} else {
+						// Select new piece if clicking on own piece
+						const piece = hoveredSquare.piece;
+						if (piece) {
+							setSelectedSquare(hoveredSquare);
+							setPossibleMoves(
+								piece.getPossibleMoves(hoveredSquare, board)
+							);
+							setCursor((prev) => ({
+								...prev,
+								cells: presets.getPiece(piece.FENChar),
+							}));
+						} else {
+							setSelectedSquare(null);
+							setPossibleMoves([]);
+							setCursor((prev) => ({
+								...prev,
+								cells: presets.cursor,
+							}));
+						}
+					}
+				} else {
+					// SELECT / PICKUP PIECE
+					const piece = hoveredSquare.piece;
+					if (piece) {
+						setSelectedSquare(hoveredSquare);
+						setPossibleMoves(
+							piece.getPossibleMoves(hoveredSquare, board)
+						);
+						setCursor((prev) => ({
+							...prev,
+							cells: presets.getPiece(piece.FENChar),
+						}));
+					}
 				}
-
-				// PICKING UP PIECE - Visual only, no board changes
-				const piece = board[hoveredSquare.row][hoveredSquare.col];
-				if (!piece) return;
-				setSelectedSquare(hoveredSquare);
-				// Update cursor to show we're holding the piece
-				setCursor((prev) => ({
-					...prev,
-					cells: presets.getPiece(piece),
-				}));
-
-				// Todo: calculate valid moves for piece
 			}
 
 			if (e.currentTarget.id === "b") {
 				// CANCEL - Just reset visual state
 				if (!selectedSquare) return;
 				setSelectedSquare(null);
+				setPossibleMoves([]);
 				setCursor((prev) => ({ ...prev, cells: presets.cursor }));
 			}
 		},
-		[board, selectedSquare, setCursor]
+		[board, makeMove, selectedSquare, setCursor]
 	);
 
 	const handleGameSelect = useCallback(() => {}, []);
