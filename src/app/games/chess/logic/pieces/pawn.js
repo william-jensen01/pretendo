@@ -77,6 +77,10 @@ export class Pawn extends Piece {
 			.filter((sq) => this.areCoordsValid(sq.col, sq.row));
 	}
 
+	isPromotion(to) {
+		return to.row === (this.color === Color.White ? 0 : 7);
+	}
+
 	get hasMoved() {
 		return this._hasMoved;
 	}

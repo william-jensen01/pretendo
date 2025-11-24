@@ -24,6 +24,7 @@ import {
 	isInCheck,
 	isValidMove,
 } from "./logic";
+import { King, Pawn, Queen } from "./logic/pieces";
 
 const initialCursor = {
 	row: Math.floor(
@@ -125,13 +126,10 @@ export default function Chess() {
 	);
 
 	const makeMove = useCallback(
-		(from, to) => {
+		(from, to, promotionPiece = null) => {
 			const newBoard = deepCopyBoard(board);
 			const piece = newBoard[from.row][from.col];
 			const capturedPiece = newBoard[to.row][to.col];
-
-			newBoard[to.row][to.col] = piece;
-			newBoard[from.row][from.col] = null;
 
 			// Handle en passant
 			if (
@@ -141,6 +139,17 @@ export default function Chess() {
 			) {
 				newBoard[from.row][to.col] = null;
 			}
+
+			// Handle promotion
+			// Todo: add piece selection (queen, rook, bishop, or knight)
+			if (promotionPiece) {
+				newBoard[to.row][to.col] = new Queen(piece.color); // default to queen
+			} else {
+				// Move piece
+				newBoard[to.row][to.col] = piece;
+			}
+
+			newBoard[from.row][from.col] = null;
 
 			// Update hasMoved flag if piece has it
 			if (piece && piece.hasMoved !== undefined) {
@@ -197,6 +206,10 @@ export default function Chess() {
 						piece &&
 						isValidMove(piece, from, to, board, gameState)
 					) {
+						// Check for pawn promotion
+						if (piece instanceof Pawn && piece.isPromotion(to)) {
+							return makeMove(from, to, true);
+						}
 						makeMove(from, to);
 					} else {
 						// Select new piece if clicking on own piece
