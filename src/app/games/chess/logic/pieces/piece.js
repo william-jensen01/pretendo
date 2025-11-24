@@ -80,6 +80,11 @@ export class Piece {
 			);
 	}
 
+	// Most pieces attack in the same direction as they move
+	getAttackingSquares(from, board) {
+		return this.getPossibleMoves(from, board);
+	}
+
 	areCoordsValid(x, y) {
 		return x >= 0 && y >= 0 && x < 8 && y < 8;
 	}

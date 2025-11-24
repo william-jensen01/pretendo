@@ -209,8 +209,3 @@ export const getHoveredSquare = (board) => {
 
 	return bestSquare;
 };
-
-export const isValidMove = (piece, from, to, board, gameState) => {
-	// First check piece-specific rules
-	return piece.isValidMove(from, to, board, gameState);
-};

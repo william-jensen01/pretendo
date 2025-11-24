@@ -12,11 +12,18 @@ import {
 	renderBoardPieces,
 	getHoveredSquare,
 	deepCopyBoard,
-	isValidMove,
 } from "./util";
 import * as presets from "./presets";
 import { useGameBoyStore } from "@/app/store/gameboy";
 import { rows, columns } from "@/app/constants";
+import { Color } from "./logic/models";
+import {
+	wouldMoveResultInCheck,
+	isCheckmate,
+	isStalemate,
+	isInCheck,
+	isValidMove,
+} from "./logic";
 
 const initialCursor = {
 	row: Math.floor(
@@ -40,6 +47,7 @@ export default function Chess() {
 	const [board, setBoard] = useState(DEFAULT_BOARD);
 	const [selectedSquare, setSelectedSquare] = useState(null);
 	const [possibleMoves, setPossibleMoves] = useState([]);
+	const [currentPlayer, setCurrentPlayer] = useState(Color.White);
 
 	// Compute grid based on board and state
 	const boardGrid = useMemo(() => {
@@ -47,6 +55,21 @@ export default function Chess() {
 		renderBoardPieces(board, next, selectedSquare, possibleMoves);
 		return next;
 	}, [board, selectedSquare, possibleMoves]);
+
+	const getPossibleMoves = useCallback(
+		(square) => {
+			const { row, col } = square;
+			const piece = board[row][col];
+			if (!piece || piece.color !== currentPlayer) return;
+			const from = { row, col };
+			const candidateMoves = piece.getPossibleMoves(from, board);
+			// Filter out moves that would result in check
+			return candidateMoves.filter(
+				(to) => !wouldMoveResultInCheck(from, to, board, piece.color)
+			);
+		},
+		[board, currentPlayer]
+	);
 
 	const loadGame = useCallback(() => {
 		setBoard(DEFAULT_BOARD);
@@ -115,8 +138,28 @@ export default function Chess() {
 				...prev,
 				cells: presets.cursor,
 			}));
+
+			// Switch players
+			const nextPlayer =
+				currentPlayer === Color.White ? Color.Black : Color.White;
+			setCurrentPlayer(nextPlayer);
+
+			// Check game status
+			if (isCheckmate(nextPlayer, newBoard)) {
+				window.alert(
+					`${currentPlayer === Color.White ? "White" : "Black"} wins!`
+				);
+			} else if (isStalemate(nextPlayer, newBoard)) {
+				window.alert("Draw by stalemate");
+			} else if (isInCheck(nextPlayer, newBoard)) {
+				window.alert(
+					`${
+						nextPlayer === Color.White ? "White" : "Black"
+					} is in check`
+				);
+			}
 		},
-		[board]
+		[board, currentPlayer]
 	);
 
 	const handleGameAction = useCallback(
@@ -124,6 +167,7 @@ export default function Chess() {
 			if (e.currentTarget.id === "a") {
 				// find square closest to cursor
 				const hoveredSquare = getHoveredSquare(board);
+				if (!hoveredSquare) return;
 				if (selectedSquare) {
 					// MAKING A MOVE / PLACING PIECE
 					const from = selectedSquare;
@@ -135,11 +179,9 @@ export default function Chess() {
 					} else {
 						// Select new piece if clicking on own piece
 						const piece = hoveredSquare.piece;
-						if (piece) {
+						if (piece && piece.color === currentPlayer) {
 							setSelectedSquare(hoveredSquare);
-							setPossibleMoves(
-								piece.getPossibleMoves(hoveredSquare, board)
-							);
+							setPossibleMoves(getPossibleMoves(hoveredSquare));
 							setCursor((prev) => ({
 								...prev,
 								cells: presets.getPiece(piece.FENChar),
@@ -158,9 +200,7 @@ export default function Chess() {
 					const piece = hoveredSquare.piece;
 					if (piece) {
 						setSelectedSquare(hoveredSquare);
-						setPossibleMoves(
-							piece.getPossibleMoves(hoveredSquare, board)
-						);
+						setPossibleMoves(getPossibleMoves(hoveredSquare));
 						setCursor((prev) => ({
 							...prev,
 							cells: presets.getPiece(piece.FENChar),
@@ -177,7 +217,14 @@ export default function Chess() {
 				setCursor((prev) => ({ ...prev, cells: presets.cursor }));
 			}
 		},
-		[board, makeMove, selectedSquare, setCursor]
+		[
+			board,
+			makeMove,
+			selectedSquare,
+			setCursor,
+			getPossibleMoves,
+			currentPlayer,
+		]
 	);
 
 	const handleGameSelect = useCallback(() => {}, []);

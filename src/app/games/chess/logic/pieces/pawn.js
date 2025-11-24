@@ -10,13 +10,13 @@ export class Pawn extends Piece {
 		// Unified directions (relative to board coordinates)
 		this._directions = [
 			// Forward 1
-			{ x: 0, y: this._moveDirection },
+			{ x: 0, y: this._moveDirection, type: "move" },
 			// Forward 2 (only from start)
-			{ x: 0, y: 2 * this._moveDirection },
+			{ x: 0, y: 2 * this._moveDirection, type: "move" },
 			// Diagonal capture left
-			{ x: -1, y: this._moveDirection },
+			{ x: -1, y: this._moveDirection, type: "attack" },
 			// Diagonal capture right
-			{ x: 1, y: this._moveDirection },
+			{ x: 1, y: this._moveDirection, type: "attack" },
 		];
 		this._FENChar =
 			pieceColor === Color.White ? FENChar.WhitePawn : FENChar.BlackPawn;
@@ -54,6 +54,14 @@ export class Pawn extends Piece {
 			return false;
 		}
 		return false;
+	}
+
+	// Pawns attack differently from their move direction
+	getAttackingSquares(from, board) {
+		return this._directions
+			.filter((d) => d.type === "attack")
+			.map((dir) => ({ row: from.row + dir.y, col: from.col + dir.x }))
+			.filter((sq) => this.areCoordsValid(sq.col, sq.row));
 	}
 
 	get hasMoved() {
