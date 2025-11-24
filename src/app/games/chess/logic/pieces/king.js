@@ -20,16 +20,12 @@ export class King extends Piece {
 		this._type = "king";
 	}
 
-	isValidMove(from, to, board) {
-		if (!super.isValidMove(from, to, board)) return false;
+	isValidMove(from, to, board, gameState = {}) {
+		if (!super.isValidMove(from, to, board, gameState)) return false;
 		const dx = Math.abs(to.col - from.col);
 		const dy = Math.abs(to.row - from.row);
 		// Normal king move (one square any direction)
 		if (dx <= 1 && dy <= 1 && (dx !== 0 || dy !== 0)) return true;
-		// Castling (horizontal move of 2 squares)
-		if (!this._hasMoved && dy === 0 && dx === 2) {
-			return this.canCastle(from, to, board);
-		}
 		return false;
 	}
 

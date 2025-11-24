@@ -22,8 +22,8 @@ export class Pawn extends Piece {
 			pieceColor === Color.White ? FENChar.WhitePawn : FENChar.BlackPawn;
 	}
 
-	isValidMove(from, to, board) {
-		if (!super.isValidMove(from, to, board)) return false;
+	isValidMove(from, to, board, gameState = {}) {
+		if (!super.isValidMove(from, to, board, gameState)) return false;
 
 		const dx = to.col - from.col;
 		const dy = to.row - from.row;
@@ -36,7 +36,7 @@ export class Pawn extends Piece {
 
 		// Forward move (2 sqaures) - only if pawn hasn't moved
 		if (dx === 0 && dy === 2 * this._moveDirection) {
-			if (!this._hasMoved) {
+			if (!this.hasMoved) {
 				// Check if both squares are empty
 				const intermediateRow = from.row + this._moveDirection;
 				if (!board[intermediateRow][from.col] && !targetPiece) {
@@ -51,7 +51,20 @@ export class Pawn extends Piece {
 			if (targetPiece && !this.isSameColor(targetPiece)) {
 				return true;
 			}
-			return false;
+
+			// En passant
+			const lastMove = gameState.lastMove;
+			if (lastMove && lastMove.piece.FENChar.toLowerCase() === "p") {
+				const movedTwoSquares =
+					Math.abs(lastMove.to.row - lastMove.from.row) === 2;
+				const isAdjacent =
+					lastMove.to.row === from.row &&
+					Math.abs(lastMove.to.col - from.col) === 1;
+				const captureSquare =
+					to.col === lastMove.to.col &&
+					to.row === from.row + this._moveDirection;
+				if (movedTwoSquares && isAdjacent && captureSquare) return true;
+			}
 		}
 		return false;
 	}

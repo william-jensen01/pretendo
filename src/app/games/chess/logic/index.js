@@ -53,6 +53,15 @@ export const wouldMoveResultInCheck = (from, to, board, color) => {
 	const testBoard = deepCopyBoard(board);
 	const piece = testBoard[from.row][from.col];
 
+	// Handle en passant capture
+	if (
+		piece._type === "pawn" &&
+		from.col !== to.col &&
+		!testBoard[to.row][to.col]
+	) {
+		testBoard[from.row][to.col] = null;
+	}
+
 	// Normal move
 	testBoard[to.row][to.col] = piece;
 	testBoard[from.row][from.col] = null;
@@ -60,9 +69,9 @@ export const wouldMoveResultInCheck = (from, to, board, color) => {
 	return isInCheck(color, testBoard);
 };
 
-export const isValidMove = (piece, from, to, board) => {
+export const isValidMove = (piece, from, to, board, gameState) => {
 	// First check piece-specific rules
-	if (!piece.isValidMove(from, to, board)) return false;
+	if (!piece.isValidMove(from, to, board, gameState)) return false;
 
 	// Then check game-level rules (can't move into check)
 	if (wouldMoveResultInCheck(from, to, board, piece.color)) return false;
@@ -70,7 +79,7 @@ export const isValidMove = (piece, from, to, board) => {
 	return true;
 };
 
-export const getAllValidMoves = (color, board) => {
+export const getAllValidMoves = (color, board, gameState) => {
 	const moves = [];
 
 	for (let r = 0; r < 8; r++) {
@@ -78,7 +87,11 @@ export const getAllValidMoves = (color, board) => {
 			const piece = board[r][c];
 			if (piece && piece.color === color) {
 				const from = { row: r, col: c };
-				const candidateMoves = piece.getPossibleMoves(from, board);
+				const candidateMoves = piece.getPossibleMoves(
+					from,
+					board,
+					gameState
+				);
 				// Add moves that don't result in check
 				candidateMoves.forEach((to) => {
 					if (!wouldMoveResultInCheck(from, to, board, color)) {

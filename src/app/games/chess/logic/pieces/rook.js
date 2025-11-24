@@ -16,8 +16,8 @@ export class Rook extends Piece {
 		this._type = "rook";
 	}
 
-	isValidMove(from, to, board) {
-		if (!super.isValidMove(from, to, board)) return false;
+	isValidMove(from, to, board, gameState = {}) {
+		if (!super.isValidMove(from, to, board, gameState)) return false;
 		// Must move in a straight line
 		if (from.row !== to.row && from.col !== to.col) return false;
 		// Can't stay in place
@@ -26,8 +26,8 @@ export class Rook extends Piece {
 		return this.isPathClear(from, to, board);
 	}
 
-	getPossibleMoves(from, board) {
-		return this.getSlidingMoves(from, board);
+	getPossibleMoves(from, board, gameState = {}) {
+		return this.getSlidingMoves(from, board, gameState);
 	}
 
 	get hasMoved() {

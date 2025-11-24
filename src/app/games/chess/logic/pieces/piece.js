@@ -18,7 +18,7 @@ export class Piece {
 	}
 
 	// Each piece implements its own movement validation
-	isValidMove(from, to, board) {
+	isValidMove(from, to, board, gameState = {}) {
 		// Base validation all pieces share
 		const targetPiece = board[to.row][to.col];
 		if (targetPiece && this.isSameColor(targetPiece)) {
@@ -49,7 +49,7 @@ export class Piece {
 		return true;
 	}
 
-	getSlidingMoves(from, board) {
+	getSlidingMoves(from, board, gameState = {}) {
 		const attacks = [];
 		for (const dir of this._directions) {
 			let currentRow = from.row + dir.y;
@@ -63,11 +63,13 @@ export class Piece {
 				currentCol += dir.x;
 			}
 		}
-		return attacks.filter((sq) => this.isValidMove(from, sq, board));
+		return attacks.filter((sq) =>
+			this.isValidMove(from, sq, board, gameState)
+		);
 	}
 
 	// Get all possible moves - base implementation
-	getPossibleMoves(from, board) {
+	getPossibleMoves(from, board, gameState = {}) {
 		return this._directions
 			.map((dir) => ({
 				row: from.row + dir.y,
@@ -76,7 +78,7 @@ export class Piece {
 			.filter(
 				(sq) =>
 					this.areCoordsValid(sq.col, sq.row) &&
-					this.isValidMove(from, sq, board)
+					this.isValidMove(from, sq, board, gameState)
 			);
 	}
 

@@ -48,6 +48,7 @@ export default function Chess() {
 	const [selectedSquare, setSelectedSquare] = useState(null);
 	const [possibleMoves, setPossibleMoves] = useState([]);
 	const [currentPlayer, setCurrentPlayer] = useState(Color.White);
+	const [lastMove, setLastMove] = useState(null);
 
 	// Compute grid based on board and state
 	const boardGrid = useMemo(() => {
@@ -60,15 +61,20 @@ export default function Chess() {
 		(square) => {
 			const { row, col } = square;
 			const piece = board[row][col];
-			if (!piece || piece.color !== currentPlayer) return;
+			if (!piece || piece.color !== currentPlayer) return [];
+			const gameState = { lastMove };
 			const from = { row, col };
-			const candidateMoves = piece.getPossibleMoves(from, board);
+			const candidateMoves = piece.getPossibleMoves(
+				from,
+				board,
+				gameState
+			);
 			// Filter out moves that would result in check
 			return candidateMoves.filter(
 				(to) => !wouldMoveResultInCheck(from, to, board, piece.color)
 			);
 		},
-		[board, currentPlayer]
+		[board, currentPlayer, lastMove]
 	);
 
 	const loadGame = useCallback(() => {
@@ -122,18 +128,30 @@ export default function Chess() {
 		(from, to) => {
 			const newBoard = deepCopyBoard(board);
 			const piece = newBoard[from.row][from.col];
+			const capturedPiece = newBoard[to.row][to.col];
 
 			newBoard[to.row][to.col] = piece;
 			newBoard[from.row][from.col] = null;
+
+			// Handle en passant
+			if (
+				piece._type === "pawn" &&
+				from.col !== to.col &&
+				!capturedPiece
+			) {
+				newBoard[from.row][to.col] = null;
+			}
 
 			// Update hasMoved flag if piece has it
 			if (piece && piece.hasMoved !== undefined) {
 				piece.hasMoved = true;
 			}
 
+			// Update game state
 			setBoard(newBoard);
 			setSelectedSquare(null);
 			setPossibleMoves([]);
+			setLastMove({ from, to, piece });
 			setCursor((prev) => ({
 				...prev,
 				cells: presets.cursor,
@@ -173,8 +191,12 @@ export default function Chess() {
 					const from = selectedSquare;
 					const to = hoveredSquare;
 					const piece = board[from.row][from.col];
+					const gameState = { lastMove };
 
-					if (piece && isValidMove(piece, from, to, board)) {
+					if (
+						piece &&
+						isValidMove(piece, from, to, board, gameState)
+					) {
 						makeMove(from, to);
 					} else {
 						// Select new piece if clicking on own piece

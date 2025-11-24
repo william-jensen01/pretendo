@@ -21,8 +21,8 @@ export class Knight extends Piece {
 		this._type = "knight";
 	}
 
-	isValidMove(from, to, board) {
-		if (!super.isValidMove(from, to, board)) return false;
+	isValidMove(from, to, board, gameState = {}) {
+		if (!super.isValidMove(from, to, board, gameState)) return false;
 		const dx = to.col - from.col;
 		const dy = to.row - from.row;
 		// Check if the move matches any of the knight's L-shaped patterns

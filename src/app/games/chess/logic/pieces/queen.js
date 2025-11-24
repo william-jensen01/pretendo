@@ -21,8 +21,8 @@ export class Queen extends Piece {
 		this._type = "queen";
 	}
 
-	isValidMove(from, to, board) {
-		if (!super.isValidMove(from, to, board)) return false;
+	isValidMove(from, to, board, gameState = {}) {
+		if (!super.isValidMove(from, to, board, gameState)) return false;
 		const dx = Math.abs(to.col - from.col);
 		const dy = Math.abs(to.row - from.row);
 		// Must move in straight line or diagonal
@@ -34,7 +34,7 @@ export class Queen extends Piece {
 	}
 
 	//
-	getPossibleMoves(from, board) {
-		return this.getSlidingMoves(from, board);
+	getPossibleMoves(from, board, gameState = {}) {
+		return this.getSlidingMoves(from, board, gameState);
 	}
 }
