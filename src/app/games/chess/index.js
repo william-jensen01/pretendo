@@ -218,7 +218,8 @@ export default function Chess() {
 
 					if (
 						piece &&
-						isValidMove(piece, from, to, board, gameState)
+						isValidMove(piece, from, to, board, gameState) &&
+						piece.color === currentPlayer
 					) {
 						// Check for pawn promotion
 						if (piece instanceof Pawn && piece.isPromotion(to)) {
