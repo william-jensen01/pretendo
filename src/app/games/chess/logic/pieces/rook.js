@@ -34,7 +34,7 @@ export class Rook extends Piece {
 		return this._hasMoved;
 	}
 
-	set hasMoved(_) {
-		this._hasMoved = true;
+	set hasMoved(v) {
+		this._hasMoved = v;
 	}
 }

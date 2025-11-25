@@ -140,6 +140,20 @@ export default function Chess() {
 				newBoard[from.row][to.col] = null;
 			}
 
+			// Handle castling
+			if (piece._type === "king" && Math.abs(to.col - from.col) === 2) {
+				const direction = to.col > from.col ? 1 : -1;
+				const rookCol = direction === 1 ? 7 : 0;
+				const newRookCol = from.col + direction;
+
+				const rook = newBoard[to.row][rookCol];
+				newBoard[from.row][newRookCol] = rook;
+				newBoard[from.row][rookCol] = null;
+				if (rook && rook.hasMoved !== undefined) {
+					rook.hasMoved = true;
+				}
+			}
+
 			// Handle promotion
 			// Todo: add piece selection (queen, rook, bishop, or knight)
 			if (promotionPiece) {

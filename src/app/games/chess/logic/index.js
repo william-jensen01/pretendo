@@ -62,6 +62,41 @@ export const wouldMoveResultInCheck = (from, to, board, color) => {
 		testBoard[from.row][to.col] = null;
 	}
 
+	// Handle castling
+	if (piece._type === "king" && Math.abs(to.col - from.col) === 2) {
+		const direction = to.col > from.col ? 1 : -1;
+		const rookCol = direction === 1 ? 7 : 0;
+		const newRookCol = from.col + direction;
+		const passThroughCol = from.col + direction;
+		const enemyColor = color === Color.White ? Color.Black : Color.White;
+		// Check starting square BEFORE moving the king
+		if (isSquareUnderAttack(from, enemyColor, testBoard)) {
+			return true;
+		}
+		// Now simulate the castling move
+		testBoard[to.row][to.col] = piece;
+		testBoard[from.row][from.col] = null;
+		testBoard[from.row][newRookCol] = testBoard[from.row][rookCol];
+		testBoard[from.row][rookCol] = null;
+		// Check pass-through and destination squares
+		if (
+			isSquareUnderAttack(
+				{ row: from.row, col: passThroughCol },
+				enemyColor,
+				testBoard
+			) ||
+			isSquareUnderAttack(
+				{ row: from.row, col: to.col },
+				enemyColor,
+				testBoard
+			)
+		) {
+			return true;
+		}
+
+		return false;
+	}
+
 	// Normal move
 	testBoard[to.row][to.col] = piece;
 	testBoard[from.row][from.col] = null;
