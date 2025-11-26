@@ -25,6 +25,8 @@ import {
 	isValidMove,
 } from "./logic";
 import { King, Pawn, Queen } from "./logic/pieces";
+import Cell from "@/app/Cell";
+import { delay } from "@/app/util/helper";
 
 const initialCursor = {
 	row: Math.floor(
@@ -45,6 +47,7 @@ export default function Chess() {
 
 	const staticGridRef = useRef(createStaticChessGrid());
 
+	const [hasTitled, setHasTitled] = useState(false);
 	const [board, setBoard] = useState(DEFAULT_BOARD);
 	const [selectedSquare, setSelectedSquare] = useState(null);
 	const [possibleMoves, setPossibleMoves] = useState([]);
@@ -78,10 +81,19 @@ export default function Chess() {
 		[board, currentPlayer, lastMove]
 	);
 
-	const loadGame = useCallback(() => {
-		setBoard(DEFAULT_BOARD);
+	const loadGame = useCallback(async () => {
+		setHasTitled(false);
+		// setBoard(DEFAULT_BOARD);
+		setGrid(() =>
+			presets.titleScreen.map((row) =>
+				row.map((c) => new Cell({ color: c }))
+			)
+		);
+		await delay(1000);
+		await delay(1500);
+		setHasTitled(true);
 		setCursor((prev) => ({ ...prev, display: true }));
-	}, [setCursor]);
+	}, [setCursor, setGrid]);
 
 	const resetGame = useCallback(() => {}, []);
 
@@ -290,9 +302,9 @@ export default function Chess() {
 	}, []);
 
 	useEffect(() => {
-		if (initializing) return;
+		if (initializing || !hasTitled) return; // don't run if console is initializing or game hasn't loaded yet
 		setGrid(boardGrid);
-	}, [initializing, setGrid, boardGrid]);
+	}, [initializing, hasTitled, setGrid, boardGrid]);
 
 	useEffect(() => {
 		setGameState({
