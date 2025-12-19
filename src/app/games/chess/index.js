@@ -27,6 +27,8 @@ import {
 import { King, Pawn, Queen } from "./logic/pieces";
 import Cell from "@/app/Cell";
 import { delay } from "@/app/util/helper";
+import { useStockfish } from "./logic/useStockfish";
+import { boardToFEN, parseStockfishMove } from "./logic/FENConverter";
 
 const initialCursor = {
 	row: Math.floor(
@@ -53,6 +55,21 @@ export default function Chess() {
 	const [possibleMoves, setPossibleMoves] = useState([]);
 	const [currentPlayer, setCurrentPlayer] = useState(Color.White);
 	const [lastMove, setLastMove] = useState(null);
+	const [computerColor, setComputerColor] = useState(Color.Black);
+	const FENRef = useRef(null);
+
+	const { isReady, bestMove, getBestMove, newGame } = useStockfish();
+
+	const updateBoardCursor = useCallback(
+		(thinking) => {
+			if (!hasTitled) return;
+			setCursor((prev) => ({
+				...prev,
+				cells: thinking ? presets.thinking : presets.cursor,
+			}));
+		},
+		[hasTitled]
+	);
 
 	// Compute grid based on board and state
 	const boardGrid = useMemo(() => {
@@ -89,11 +106,13 @@ export default function Chess() {
 				row.map((c) => new Cell({ color: c }))
 			)
 		);
+		// Initialize new game with desired difficulty
+		newGame(0); // 0 = weakest, 20 = strongest
 		await delay(1000);
 		await delay(1500);
 		setHasTitled(true);
 		setCursor((prev) => ({ ...prev, display: true }));
-	}, [setCursor, setGrid]);
+	}, [setCursor, setGrid, newGame]);
 
 	const resetGame = useCallback(() => {}, []);
 
@@ -187,15 +206,12 @@ export default function Chess() {
 			setSelectedSquare(null);
 			setPossibleMoves([]);
 			setLastMove({ from, to, piece });
-			setCursor((prev) => ({
-				...prev,
-				cells: presets.cursor,
-			}));
 
 			// Switch players
 			const nextPlayer =
 				currentPlayer === Color.White ? Color.Black : Color.White;
 			setCurrentPlayer(nextPlayer);
+			updateBoardCursor(false);
 
 			// Check game status
 			if (isCheckmate(nextPlayer, newBoard)) {
@@ -217,6 +233,9 @@ export default function Chess() {
 
 	const handleGameAction = useCallback(
 		(e) => {
+			// Prevent interaction during computer's turn
+			if (currentPlayer === computerColor) return;
+
 			if (e.currentTarget.id === "a") {
 				// find square closest to cursor
 				const hoveredSquare = getHoveredSquare(board);
@@ -286,6 +305,8 @@ export default function Chess() {
 			setCursor,
 			getPossibleMoves,
 			currentPlayer,
+			lastMove,
+			computerColor,
 		]
 	);
 
@@ -297,7 +318,67 @@ export default function Chess() {
 
 	const handleGameEEShortcuts = useCallback(() => {}, []);
 
+	// Request and execute computer move in one place
 	useEffect(() => {
+		if (!hasTitled || currentPlayer !== computerColor || !isReady) return;
+
+		updateBoardCursor(true);
+
+		const fen = boardToFEN(board, currentPlayer, lastMove);
+
+		getBestMove(fen, (move) => {
+			// Handle no legal moves
+			if (bestMove === "(none)" || bestMove === "none") {
+				console.warn(
+					"Stockfish returned no move - checking game state"
+				);
+
+				// Determine if it's checkmate or stalemate
+				if (isCheckmate(computerColor, board)) {
+					const winner =
+						computerColor === Color.White ? "Black" : "White";
+					window.alert(`${winner} wins by checkmate!`);
+				} else if (isStalemate(computerColor, board)) {
+					window.alert("Draw by stalemate");
+				} else {
+					// This shouldn't happen - likely invalid position
+					console.error(
+						"Invalid game state - no moves but not checkmate/stalemate"
+					);
+					console.error("Current FEN:", FENRef.current);
+				}
+
+				setCurrentPlayer(
+					currentPlayer === Color.White ? Color.Black : Color.White
+				);
+				updateBoardCursor(false);
+				return;
+			}
+
+			const parsedMove = parseStockfishMove(move);
+			if (!parsedMove) return;
+
+			const { from, to, promotion } = parsedMove;
+			const piece = board[from.row][from.col];
+			if (!piece) return;
+
+			const isPromotion = piece instanceof Pawn && piece.isPromotion(to);
+			makeMove(from, to, isPromotion || promotion);
+		});
+	}, [
+		hasTitled,
+		currentPlayer,
+		computerColor,
+		isReady,
+		updateBoardCursor,
+		board,
+		getBestMove,
+		lastMove,
+		makeMove,
+	]);
+
+	useEffect(() => {
+		// Set cursor to initial state, will update display status when game is loaded
 		setCursor(() => ({ ...initialCursor }));
 	}, []);
 

@@ -70,3 +70,5 @@ export const DEFAULT_BOARD = [
 		new Rook(Color.White),
 	], // Black back rank
 ];
+
+export const SKILL_LEVEL = 0; // 0 = weakest, 20 = strongest
