@@ -72,3 +72,5 @@ export const DEFAULT_BOARD = [
 ];
 
 export const SKILL_LEVEL = 0; // 0 = weakest, 20 = strongest
+
+export const ANIMATION_SPEED = 1; // grid cells per animation frame

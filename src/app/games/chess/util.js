@@ -105,7 +105,8 @@ export const renderBoardPieces = (
 	board,
 	staticGrid,
 	selectedSquare,
-	possibleMoves
+	possibleMoves,
+	animating = null
 ) => {
 	const loopPiece = (piece, [rOffset, cOffset] = [0, 0]) => {
 		for (let r = 0; r < piece.length; r++) {
@@ -125,6 +126,15 @@ export const renderBoardPieces = (
 	board.forEach((rankRow, rankIdx) => {
 		rankRow.forEach((piece, fileIdx) => {
 			if (!piece) return;
+
+			// Skip the piece being animated (it's rendered separately)
+			if (
+				animating &&
+				rankIdx === animating.sourcePos.row &&
+				fileIdx === animating.sourcePos.col
+			) {
+				return;
+			}
 
 			const gCol = fileIdx * SQUARE_SIZE + BOARD_OFFSET;
 			const gRow = rankIdx * SQUARE_SIZE + BOARD_OFFSET;
@@ -151,6 +161,20 @@ export const renderBoardPieces = (
 			const gRow = row * SQUARE_SIZE + BOARD_OFFSET;
 			renderSquareHighlight(staticGrid, gRow, gCol, "possible");
 		});
+	}
+};
+
+export const renderPieceAt = (grid, pieceArr, targetPos) => {
+	const { row: rOffset, col: cOffset } = targetPos;
+	console.log(targetPos);
+	for (let r = 0; r < pieceArr.length; r++) {
+		for (let c = 0; c < pieceArr[r].length; c++) {
+			const color = pieceArr[r][c];
+			if (color === 0) continue; // ignore
+			const gr = r + rOffset;
+			const gc = c + cOffset;
+			grid[gr][gc] = new Cell({ color: color - 1 });
+		}
 	}
 };
 

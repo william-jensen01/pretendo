@@ -6,12 +6,14 @@ import {
 	NUM_FILES,
 	NUM_RANKS,
 	HORIZONTAL_AXIS,
+	ANIMATION_SPEED,
 } from "./constants";
 import {
 	createStaticChessGrid,
 	renderBoardPieces,
 	getHoveredSquare,
 	deepCopyBoard,
+	renderPieceAt,
 } from "./util";
 import * as presets from "./presets";
 import { useGameBoyStore } from "@/app/store/gameboy";
@@ -26,7 +28,7 @@ import {
 } from "./logic";
 import { King, Pawn, Queen } from "./logic/pieces";
 import Cell from "@/app/Cell";
-import { delay } from "@/app/util/helper";
+import { delay, continuouslyAnimate } from "@/app/util/helper";
 import { useStockfish } from "./logic/useStockfish";
 import { boardToFEN, parseStockfishMove } from "./logic/FENConverter";
 
@@ -57,6 +59,8 @@ export default function Chess() {
 	const [lastMove, setLastMove] = useState(null);
 	const [computerColor, setComputerColor] = useState(Color.Black);
 	const FENRef = useRef(null);
+	const animatingPieceRef = useRef(null);
+	const animationRef = useRef({ running: false });
 
 	const { isReady, bestMove, getBestMove, newGame } = useStockfish();
 
@@ -156,6 +160,130 @@ export default function Chess() {
 		[setCursor]
 	);
 
+	// Build grid with current animation state
+	const buildAnimatedGrid = useCallback(() => {
+		const next = staticGridRef.current.map((row) => [...row]);
+		const animating = animatingPieceRef.current;
+
+		renderBoardPieces(
+			board,
+			next,
+			selectedSquare,
+			possibleMoves,
+			animating
+		);
+
+		if (animating) {
+			const pieceArr = presets.getPiece(animating.piece.FENChar);
+			if (pieceArr) {
+				renderPieceAt(next, pieceArr, {
+					row: Math.round(animating.currentPos.row),
+					col: Math.round(animating.currentPos.col),
+				});
+			}
+		}
+
+		return next;
+	}, [board, selectedSquare, possibleMoves]);
+
+	const animatePieceMove = useCallback(
+		(piece, from, to, onComplete) => {
+			if (from.row === to.row && from.col === to.col) {
+				// No movement needed
+				onComplete();
+				return;
+			}
+
+			const fromGRow = from.row * SQUARE_SIZE + BOARD_OFFSET;
+			const fromGCol = from.col * SQUARE_SIZE + BOARD_OFFSET;
+			const toGRow = to.row * SQUARE_SIZE + BOARD_OFFSET;
+			const toGCol = to.col * SQUARE_SIZE + BOARD_OFFSET;
+
+			const dx = toGCol - fromGCol;
+			const dy = toGRow - fromGRow;
+			const distance = Math.sqrt(dx * dx + dy * dy);
+
+			// Normalize to get unit vector, then scale by speed
+			const velocity = {
+				row: (dy / distance) * ANIMATION_SPEED,
+				col: (dx / distance) * ANIMATION_SPEED,
+			};
+
+			animatingPieceRef.current = {
+				piece,
+				sourcePos: { row: from.row, col: from.col },
+				currentPos: { row: fromGRow, col: fromGCol },
+				targetPos: { row: toGRow, col: toGCol },
+				velocity,
+			};
+
+			animationRef.current.running = true;
+
+			const { animate } = continuouslyAnimate(
+				"pieceMove",
+				animationRef,
+				() => {
+					const anim = animatingPieceRef.current;
+					if (!anim) return false;
+
+					anim.currentPos.row += anim.velocity.row;
+					anim.currentPos.col += anim.velocity.col;
+
+					const remainingX = anim.targetPos.col - anim.currentPos.col;
+					const remainingY = anim.targetPos.row - anim.currentPos.row;
+					const remainingDist = Math.sqrt(
+						remainingX * remainingX + remainingY * remainingY
+					);
+
+					const grid = buildAnimatedGrid();
+					setGrid(grid);
+
+					if (remainingDist < ANIMATION_SPEED) {
+						console.log("piece animation complete...stopping");
+						animatingPieceRef.current = null;
+						animationRef.current.running = false;
+						onComplete();
+						return false;
+					}
+
+					return true;
+				},
+				0,
+				60
+			);
+
+			animate();
+		},
+		[setGrid, buildAnimatedGrid]
+	);
+
+	const applyBoardUpdate = useCallback(
+		(newBoard, nextPlayer, lastMove) => {
+			setBoard(newBoard);
+			setLastMove(lastMove);
+			setCurrentPlayer(nextPlayer);
+			setSelectedSquare(null);
+			setPossibleMoves([]);
+			updateBoardCursor(false);
+
+			// Check game status
+			if (isCheckmate(nextPlayer, newBoard)) {
+				window.alert(
+					`${nextPlayer === Color.White ? "Black" : "White"} wins!`
+				);
+			} else if (isStalemate(nextPlayer, newBoard)) {
+				window.alert("Draw by stalemate");
+			} else if (isInCheck(nextPlayer, newBoard)) {
+				window.alert(
+					`${
+						nextPlayer === Color.White ? "White" : "Black"
+					} is in check`
+				);
+			}
+		},
+		[updateBoardCursor]
+	);
+
 	const makeMove = useCallback(
 		(from, to, promotionPiece = null) => {
 			const newBoard = deepCopyBoard(board);
@@ -201,34 +329,20 @@ export default function Chess() {
 				piece.hasMoved = true;
 			}
 
-			// Update game state
-			setBoard(newBoard);
-			setSelectedSquare(null);
-			setPossibleMoves([]);
-			setLastMove({ from, to, piece });
-
-			// Switch players
 			const nextPlayer =
 				currentPlayer === Color.White ? Color.Black : Color.White;
-			setCurrentPlayer(nextPlayer);
-			updateBoardCursor(false);
 
-			// Check game status
-			if (isCheckmate(nextPlayer, newBoard)) {
-				window.alert(
-					`${currentPlayer === Color.White ? "White" : "Black"} wins!`
-				);
-			} else if (isStalemate(nextPlayer, newBoard)) {
-				window.alert("Draw by stalemate");
-			} else if (isInCheck(nextPlayer, newBoard)) {
-				window.alert(
-					`${
-						nextPlayer === Color.White ? "White" : "Black"
-					} is in check`
-				);
+			// Only animate the computer's turn'
+			if (currentPlayer === computerColor) {
+				animatePieceMove(piece, from, to, () => {
+					// Animate, then apply board update
+					applyBoardUpdate(newBoard, nextPlayer, { from, to, piece });
+				});
+			} else {
+				applyBoardUpdate(newBoard, nextPlayer, { from, to, piece });
 			}
 		},
-		[board, currentPlayer]
+		[board, currentPlayer, animatePieceMove]
 	);
 
 	const handleGameAction = useCallback(
