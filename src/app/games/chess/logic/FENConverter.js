@@ -106,6 +106,15 @@ export const getCastlingRights = (board) => {
 	return rights;
 };
 
+export const historyToUCI = (moveHistory) => {
+	const uci = moveHistory.reduce((acc, move, idx) => {
+		acc += move.notation;
+		if (idx < moveHistory.length - 1) acc += " ";
+		return acc;
+	}, "");
+	return uci;
+};
+
 export const parseStockfishMove = (moveStr) => {
 	console.log("Parsing move:", moveStr);
 	if (!moveStr || moveStr.length < 4) return null;
@@ -119,8 +128,15 @@ export const parseStockfishMove = (moveStr) => {
 	const promotion = moveStr.length === 5 ? moveStr[4] : null;
 
 	return {
-		from: { row: fromRank, col: fromFile },
-		to: { row: toRank, col: toFile },
+		from: {
+			row: fromRank,
+			col: fromFile,
+			rank: moveStr[1],
+			file: moveStr[0],
+		},
+		to: { row: toRank, col: toFile, rank: moveStr[3], file: moveStr[2] },
 		promotion,
+		notation: moveStr,
+		display: `${moveStr[0]}${moveStr[1]}-${moveStr[2]}${moveStr[3]}`,
 	};
 };

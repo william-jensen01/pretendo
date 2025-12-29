@@ -1,5 +1,6 @@
 import { Rook, Knight, Bishop, Queen, King, Pawn } from "./logic/pieces";
 import { Color } from "./logic/models";
+import { rows } from "@/app/constants";
 
 export const SQUARE_SIZE = 16;
 export const SQUARE_PADDING = 1;
@@ -74,3 +75,44 @@ export const DEFAULT_BOARD = [
 export const SKILL_LEVEL = 0; // 0 = weakest, 20 = strongest
 
 export const ANIMATION_SPEED = 1; // grid cells per animation frame
+
+export const DATA_SCREEN_CONFIG = {
+	BACKGROUND_COLOR: 3, // actual color value
+	MARGIN: {
+		TOP: 3,
+		RIGHT: 4,
+		BOTTOM: 3,
+		LEFT: 3,
+	},
+	// Not actual color values but adjustments
+	COLOR: {
+		DEFAULT: 1,
+		MOVE: 2,
+		GUIDE: 1,
+	},
+	CAPTURES: {
+		START_ROW: rows - 6 * 8,
+		START_COL: {
+			// Has to be retrievable using Color model
+			// 0 = White, 1 = Black
+			0: 0,
+			1: 80,
+		},
+	},
+	HISTORY: {
+		START_ROW: 16,
+		START_COL: 8,
+		LINE_HEIGHT: 8,
+		GAP_BETWEEN_MOVES: 16,
+	},
+	GUIDES: {
+		COLOR: 0, // actual color value
+		V_SEPARATOR: {
+			COL: 8 * 13 + 3,
+		},
+		H_SEPARATOR: {
+			ROW: 8 * 3 + 3,
+			START_COL: 8 * 13 + 3,
+		},
+	},
+};

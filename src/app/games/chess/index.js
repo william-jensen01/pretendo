@@ -14,6 +14,7 @@ import {
 	getHoveredSquare,
 	deepCopyBoard,
 	renderPieceAt,
+	renderDataScreen,
 } from "./util";
 import * as presets from "./presets";
 import { useGameBoyStore } from "@/app/store/gameboy";
@@ -26,11 +27,12 @@ import {
 	isInCheck,
 	isValidMove,
 } from "./logic";
-import { King, Pawn, Queen } from "./logic/pieces";
+import { Pawn, Queen } from "./logic/pieces";
 import Cell from "@/app/Cell";
 import { delay, continuouslyAnimate } from "@/app/util/helper";
 import { useStockfish } from "./logic/useStockfish";
-import { boardToFEN, parseStockfishMove } from "./logic/FENConverter";
+import { parseStockfishMove, historyToUCI } from "./logic/FENConverter";
+import { useClickSequenceDetection } from "@/app/util/useClickSequenceDetection";
 
 const initialCursor = {
 	row: Math.floor(
@@ -56,13 +58,15 @@ export default function Chess() {
 	const [selectedSquare, setSelectedSquare] = useState(null);
 	const [possibleMoves, setPossibleMoves] = useState([]);
 	const [currentPlayer, setCurrentPlayer] = useState(Color.White);
-	const [lastMove, setLastMove] = useState(null);
 	const [computerColor, setComputerColor] = useState(Color.Black);
-	const FENRef = useRef(null);
+	const [moveHistory, setMoveHistory] = useState([]);
+	const [capturedPieces, setCapturedPieces] = useState([]);
+	const [moveHelp, setMoveHelp] = useState([]); // [best, hint] moves
 	const animatingPieceRef = useRef(null);
 	const animationRef = useRef({ running: false });
+	const dataScreenRef = useRef(false);
 
-	const { isReady, bestMove, getBestMove, newGame } = useStockfish();
+	const { isReady, bestMove, getBestMove, newGame, getHint } = useStockfish();
 
 	const updateBoardCursor = useCallback(
 		(thinking) => {
@@ -82,12 +86,18 @@ export default function Chess() {
 		return next;
 	}, [board, selectedSquare, possibleMoves]);
 
+	const getLastMove = useCallback(() => {
+		return moveHistory?.length > 0
+			? moveHistory[moveHistory.length - 1]
+			: null;
+	}, [moveHistory]);
+
 	const getPossibleMoves = useCallback(
 		(square) => {
 			const { row, col } = square;
 			const piece = board[row][col];
 			if (!piece || piece.color !== currentPlayer) return [];
-			const gameState = { lastMove };
+			const gameState = { lastMove: getLastMove() };
 			const from = { row, col };
 			const candidateMoves = piece.getPossibleMoves(
 				from,
@@ -99,7 +109,7 @@ export default function Chess() {
 				(to) => !wouldMoveResultInCheck(from, to, board, piece.color)
 			);
 		},
-		[board, currentPlayer, lastMove]
+		[board, currentPlayer, getLastMove]
 	);
 
 	const loadGame = useCallback(async () => {
@@ -259,12 +269,14 @@ export default function Chess() {
 
 	const applyBoardUpdate = useCallback(
 		(newBoard, nextPlayer, lastMove) => {
+			setMoveHistory((prev) => [...prev, lastMove]);
 			setBoard(newBoard);
-			setLastMove(lastMove);
 			setCurrentPlayer(nextPlayer);
 			setSelectedSquare(null);
 			setPossibleMoves([]);
 			updateBoardCursor(false);
+			if (lastMove.captured)
+				setCapturedPieces((prev) => [...prev, lastMove.captured]);
 
 			// Check game status
 			if (isCheckmate(nextPlayer, newBoard)) {
@@ -286,6 +298,7 @@ export default function Chess() {
 
 	const makeMove = useCallback(
 		(from, to, promotionPiece = null) => {
+			console.log("makeMove", { from, to, promotionPiece });
 			const newBoard = deepCopyBoard(board);
 			const piece = newBoard[from.row][from.col];
 			const capturedPiece = newBoard[to.row][to.col];
@@ -315,8 +328,12 @@ export default function Chess() {
 
 			// Handle promotion
 			// Todo: add piece selection (queen, rook, bishop, or knight)
+			const PromotionClass = Queen;
+			let promotionFENChar;
 			if (promotionPiece) {
-				newBoard[to.row][to.col] = new Queen(piece.color); // default to queen
+				const PromotionPiece = new PromotionClass(piece.color);
+				newBoard[to.row][to.col] = PromotionPiece;
+				promotionFENChar = PromotionPiece.FENChar;
 			} else {
 				// Move piece
 				newBoard[to.row][to.col] = piece;
@@ -332,17 +349,34 @@ export default function Chess() {
 			const nextPlayer =
 				currentPlayer === Color.White ? Color.Black : Color.White;
 
+			const moveEntry = {
+				from,
+				to,
+				piece,
+				captured: capturedPiece,
+				notation: `${from.file}${from.rank}${to.file}${to.rank}${
+					promotionFENChar ? promotionFENChar : ""
+				}`,
+				display: `${from.file}${from.rank}-${to.file}${to.rank}`,
+			};
+
 			// Only animate the computer's turn'
 			if (currentPlayer === computerColor) {
-				animatePieceMove(piece, from, to, () => {
-					// Animate, then apply board update
-					applyBoardUpdate(newBoard, nextPlayer, { from, to, piece });
-				});
+				// Animate, then apply board update
+				animatePieceMove(piece, from, to, () =>
+					applyBoardUpdate(newBoard, nextPlayer, moveEntry)
+				);
 			} else {
-				applyBoardUpdate(newBoard, nextPlayer, { from, to, piece });
+				applyBoardUpdate(newBoard, nextPlayer, moveEntry);
 			}
 		},
-		[board, currentPlayer, animatePieceMove]
+		[
+			board,
+			currentPlayer,
+			animatePieceMove,
+			computerColor,
+			applyBoardUpdate,
+		]
 	);
 
 	const handleGameAction = useCallback(
@@ -359,7 +393,7 @@ export default function Chess() {
 					const from = selectedSquare;
 					const to = hoveredSquare;
 					const piece = board[from.row][from.col];
-					const gameState = { lastMove };
+					const gameState = { lastMove: getLastMove() };
 
 					if (
 						piece &&
@@ -419,7 +453,7 @@ export default function Chess() {
 			setCursor,
 			getPossibleMoves,
 			currentPlayer,
-			lastMove,
+			getLastMove,
 			computerColor,
 		]
 	);
@@ -430,7 +464,47 @@ export default function Chess() {
 
 	const handleGameCellClick = useCallback(() => {}, []);
 
-	const handleGameEEShortcuts = useCallback(() => {}, []);
+	const handleGameEEShortcuts = useMemo(
+		() => [
+			[
+				["start"],
+				() => {
+					// Don't run if animation is ongoing
+					if (animationRef.current.running) return;
+
+					// Show Data Screen, cursor is hidden
+					if (!dataScreenRef.current) {
+						setCursor((prev) => ({ ...prev, display: false }));
+						const parsedMoveHelp =
+							moveHelp.length == 2
+								? [
+										parseStockfishMove(moveHelp[0]).display,
+										parseStockfishMove(moveHelp[1]).display,
+								  ]
+								: [];
+						setGrid(
+							renderDataScreen(
+								moveHistory,
+								parsedMoveHelp,
+								capturedPieces
+							)
+						);
+					}
+
+					// Go back to board view, cursor is visible
+					if (dataScreenRef.current) {
+						setBoard(board.map((row) => [...row]));
+						setCursor((prev) => ({ ...prev, display: true }));
+					}
+
+					dataScreenRef.current = !dataScreenRef.current;
+				},
+			],
+		],
+		[board, moveHistory, currentPlayer, moveHelp, capturedPieces]
+	);
+
+	useClickSequenceDetection(handleGameEEShortcuts);
 
 	// Request and execute computer move in one place
 	useEffect(() => {
@@ -438,9 +512,9 @@ export default function Chess() {
 
 		updateBoardCursor(true);
 
-		const fen = boardToFEN(board, currentPlayer, lastMove);
+		const moves = historyToUCI(moveHistory);
 
-		getBestMove(fen, (move) => {
+		getBestMove(moves, (move) => {
 			// Handle no legal moves
 			if (bestMove === "(none)" || bestMove === "none") {
 				console.warn(
@@ -459,7 +533,6 @@ export default function Chess() {
 					console.error(
 						"Invalid game state - no moves but not checkmate/stalemate"
 					);
-					console.error("Current FEN:", FENRef.current);
 				}
 
 				setCurrentPlayer(
@@ -472,9 +545,12 @@ export default function Chess() {
 			const parsedMove = parseStockfishMove(move);
 			if (!parsedMove) return;
 
-			const { from, to, promotion } = parsedMove;
+			const { from, to, promotion, notation } = parsedMove;
 			const piece = board[from.row][from.col];
 			if (!piece) return;
+
+			// get hint with new move
+			getHint(moves + " " + notation, (info) => setMoveHelp(info));
 
 			const isPromotion = piece instanceof Pawn && piece.isPromotion(to);
 			makeMove(from, to, isPromotion || promotion);
@@ -484,10 +560,9 @@ export default function Chess() {
 		currentPlayer,
 		computerColor,
 		isReady,
+		moveHistory,
 		updateBoardCursor,
-		board,
 		getBestMove,
-		lastMove,
 		makeMove,
 	]);
 
@@ -513,7 +588,6 @@ export default function Chess() {
 			handleGameSelect,
 			handleGameStart,
 			handleGameCellClick,
-			handleGameEEShortcuts,
 		});
 	}, [
 		setGameState,
@@ -526,6 +600,5 @@ export default function Chess() {
 		handleGameSelect,
 		handleGameStart,
 		handleGameCellClick,
-		handleGameEEShortcuts,
 	]);
 }

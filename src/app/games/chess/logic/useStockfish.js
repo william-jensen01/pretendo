@@ -14,9 +14,14 @@ export const useStockfish = () => {
 	const engineRef = useRef(null);
 	const [isReady, setIsReady] = useState(false);
 	const pendingRequestRef = useRef(false);
-	const lastFENRef = useRef(null);
+	const lastMovesRef = useRef(null);
 	const searchingRef = useRef(false);
 	const onMoveCallbackRef = useRef(null);
+
+	const hintingRef = useRef(false);
+	const onHintCallbackRef = useRef(null);
+	const bestMoveHintRef = useRef(null);
+	const hintMoveRef = useRef(null);
 
 	// Pending configuration
 	const pendingConfigRef = useRef(calculateStats(SKILL_LEVEL));
@@ -73,15 +78,48 @@ export const useStockfish = () => {
 				}
 			}
 
+			if (message.startsWith("info") && hintingRef.current) {
+				// Collect multipv reuslts
+				if (message.includes("multipv 1")) {
+					// Store best move from pv
+					const pvMatch = message.match(/\bpv\s+(\S+)/);
+					if (pvMatch) {
+						bestMoveHintRef.current = pvMatch[1];
+					}
+				}
+				if (message.includes("multipv 2")) {
+					// Store hint move from pv
+					const pvMatch = message.match(/\bpv\s+(\S+)/);
+					if (pvMatch) {
+						hintMoveRef.current = pvMatch[1];
+					}
+				}
+			}
+
 			if (message.startsWith("bestmove")) {
 				const move = message.split(" ")[1];
 
-				// Execute callback with the move
-				if (onMoveCallbackRef.current) {
+				// Handle hint callback
+				if (hintingRef.current && onHintCallbackRef.current) {
+					onHintCallbackRef.current([
+						bestMoveHintRef.current || move,
+						hintMoveRef.current || move,
+					]);
+					onHintCallbackRef.current = null;
+					hintingRef.current = false;
+					// Reset MultiPV
+					engineRef.current.postMessage(
+						"setoption name MultiPV value 1"
+					);
+				}
+				// Handle move callback
+				else if (onMoveCallbackRef.current) {
 					onMoveCallbackRef.current(move);
 					onMoveCallbackRef.current = null;
 				}
+
 				pendingRequestRef.current = false;
+				searchingRef.current = false;
 			}
 		};
 
@@ -119,26 +157,25 @@ export const useStockfish = () => {
 
 	// Memoize getBestMove to prevent recreating on every render
 	const getBestMove = useCallback(
-		(fen, onMove) => {
+		(moves, onMove) => {
 			if (!engineRef.current || !isReady) {
 				console.warn("Stockfish not ready");
 				return;
 			}
 
+			const moveStr = moves
+				? Array.isArray(moves)
+					? moves.join(" ")
+					: moves
+				: "";
+
 			// Prevent duplicate requests for the same position
-			if (pendingRequestRef.current && lastFENRef.current === fen) {
+			if (pendingRequestRef.current && lastMovesRef.current === moveStr) {
 				console.log("Ignoring duplicate request for same position");
 				return;
 			}
 			pendingRequestRef.current = true;
-			lastFENRef.current = fen;
-
-			// Validate FEN format (basic check)
-			const fenParts = fen.split(" ");
-			if (fenParts.length !== 6) {
-				console.error("Invalid FEN format:", fen);
-				return;
-			}
+			lastMovesRef.current = moveStr;
 
 			// Stop any in-progress search
 			stopSearch();
@@ -146,10 +183,36 @@ export const useStockfish = () => {
 			onMoveCallbackRef.current = onMove;
 
 			// Set position and search
-			engineRef.current.postMessage(`position fen ${fen}`);
+			engineRef.current.postMessage(`position startpos moves ${moveStr}`);
 			engineRef.current.postMessage(
 				`go depth ${pendingConfigRef.current.depth}`
 			);
+		},
+		[isReady, stopSearch]
+	);
+
+	const getHint = useCallback(
+		(moves, callback) => {
+			if (!engineRef.current || !isReady) {
+				console.warn("Stockfish not ready");
+				return;
+			}
+
+			const moveStr = moves
+				? Array.isArray(moves)
+					? moves.join(" ")
+					: moves
+				: "";
+
+			bestMoveHintRef.current = null;
+			hintMoveRef.current = null;
+
+			hintingRef.current = true;
+			onHintCallbackRef.current = callback;
+
+			engineRef.current.postMessage("setoption name MultiPV value 2");
+			engineRef.current.postMessage(`position startpos moves ${moveStr}`);
+			engineRef.current.postMessage("go depth 2");
 		},
 		[isReady, stopSearch]
 	);
@@ -160,7 +223,8 @@ export const useStockfish = () => {
 			getBestMove,
 			newGame,
 			stopSearch,
+			getHint,
 		}),
-		[isReady, getBestMove, newGame, stopSearch]
+		[isReady, getBestMove, newGame, stopSearch, getHint]
 	);
 };

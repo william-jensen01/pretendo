@@ -10,9 +10,11 @@ import {
 	VERTICAL_AXIS,
 	NUM_RANKS,
 	NUM_FILES,
+	DATA_SCREEN_CONFIG,
 } from "./constants";
 import * as presets from "./presets";
 import { useGameBoyStore } from "@/app/store/gameboy";
+import { Color } from "./logic/models";
 import { Pawn } from "./logic/pieces";
 
 export const createStaticChessGrid = () => {
@@ -166,7 +168,6 @@ export const renderBoardPieces = (
 
 export const renderPieceAt = (grid, pieceArr, targetPos) => {
 	const { row: rOffset, col: cOffset } = targetPos;
-	console.log(targetPos);
 	for (let r = 0; r < pieceArr.length; r++) {
 		for (let c = 0; c < pieceArr[r].length; c++) {
 			const color = pieceArr[r][c];
@@ -232,4 +233,192 @@ export const getHoveredSquare = (board) => {
 	});
 
 	return bestSquare;
+};
+
+// DATA SCREEN
+
+export const renderText = (
+	text,
+	grid,
+	rOffset,
+	cOffset,
+	color = DATA_SCREEN_CONFIG.COLOR.DEFAULT
+) => {
+	text.split("").forEach((c, idx) => {
+		const charArr = presets.getChar(c);
+		if (charArr) {
+			const adjColorCharArr = charArr.map((r) =>
+				r.map((c) => (c ? color : 0))
+			);
+			renderPieceAt(grid, adjColorCharArr, {
+				row: rOffset,
+				col: cOffset + idx * 8,
+			});
+		}
+	});
+};
+
+const renderThinkingWindow = (bestMove, grid) => {
+	renderText("best", grid, 32, 112, DATA_SCREEN_CONFIG.COLOR.GUIDE);
+	if (bestMove && bestMove.length > 0) {
+		renderText(bestMove, grid, 40, 112, DATA_SCREEN_CONFIG.COLOR.MOVE);
+	}
+};
+
+const renderHint = (hintMove, grid) => {
+	renderText("hint", grid, 8, 112, DATA_SCREEN_CONFIG.COLOR.GUIDE);
+	if (hintMove && hintMove.length > 0) {
+		renderText(hintMove, grid, 16, 112, DATA_SCREEN_CONFIG.COLOR.MOVE);
+	}
+};
+
+export const renderMoveHistory = (moveHistory, grid) => {
+	if (!moveHistory || moveHistory.length === 0) return grid;
+
+	// Can display up to 9 moves for each color
+
+	const renderableRows = 9;
+	const historySlice = moveHistory.slice(
+		Math.max(moveHistory.length - renderableRows * 2, 0) // * 2 because we're rendering pairs
+	);
+
+	let currentRow = DATA_SCREEN_CONFIG.HISTORY.START_ROW;
+	let currentCol = DATA_SCREEN_CONFIG.HISTORY.START_COL;
+
+	// Format moves in pairs (White, Black)
+	for (let i = 0; i < historySlice.length; i += 2) {
+		const whiteMove = historySlice[i];
+		const blackMove = historySlice[i + 1];
+
+		// Render white's move
+		if (whiteMove) {
+			renderText(
+				whiteMove.display,
+				grid,
+				currentRow,
+				currentCol,
+				DATA_SCREEN_CONFIG.COLOR.MOVE
+			);
+		}
+
+		currentCol +=
+			whiteMove.display.length * 8 +
+			DATA_SCREEN_CONFIG.HISTORY.GAP_BETWEEN_MOVES; // spacing between moves
+
+		// Render black's move
+		if (blackMove) {
+			renderText(
+				blackMove.display,
+				grid,
+				currentRow,
+				currentCol,
+				DATA_SCREEN_CONFIG.COLOR.MOVE
+			);
+		}
+
+		// Move to next line
+		currentRow += DATA_SCREEN_CONFIG.HISTORY.LINE_HEIGHT;
+		currentCol = DATA_SCREEN_CONFIG.HISTORY.START_COL;
+
+		// Could add a break if currentRow exceeds screen space
+		// But since we are rendering a set number of pairs, there's no need
+		// if (currentRow > 96) break;
+	}
+
+	return grid;
+};
+
+const renderCapturedPieces = (captures, grid) => {
+	if (!captures || captures.length === 0) return grid;
+
+	const renderColorCaptures = (color, captures, grid) => {
+		captures.forEach((piece, idx) => {
+			const oRow = Math.floor(idx / 5);
+			const oCol = idx % 5;
+			const gRow = DATA_SCREEN_CONFIG.CAPTURES.START_ROW + oRow * 16;
+			const gCol =
+				DATA_SCREEN_CONFIG.CAPTURES.START_COL[color] + oCol * 16;
+			renderPieceAt(grid, presets.getPiece(piece.FENChar), {
+				row: gRow,
+				col: gCol,
+			});
+		});
+	};
+
+	const whiteCaptures = captures.filter((p) => p.color === Color.Black);
+	const blackCaptures = captures.filter((p) => p.color === Color.White);
+
+	renderColorCaptures(Color.White, whiteCaptures, grid);
+	renderColorCaptures(Color.Black, blackCaptures, grid);
+};
+
+export const renderDataScreen = (moveHistory, moveHelp, capturedPieces) => {
+	const grid = create2dArray();
+	const { TOP, RIGHT, BOTTOM, LEFT } = DATA_SCREEN_CONFIG.MARGIN;
+	const boxHeight = 89; // height not index
+	const boxWidth = columns - 1 - LEFT - RIGHT;
+
+	const bottomY = TOP + boxHeight - 1;
+	const rightX = LEFT + boxWidth;
+
+	// set everything to be black
+	for (let r = 0; r < rows; r++) {
+		for (let c = 0; c < columns; c++) {
+			grid[r][c] = new Cell({
+				color: DATA_SCREEN_CONFIG.BACKGROUND_COLOR,
+			});
+		}
+	}
+
+	// Render Outlines
+
+	// top border
+	for (let x = LEFT; x <= boxWidth + LEFT; x++)
+		grid[TOP][x] = new Cell({ color: DATA_SCREEN_CONFIG.GUIDES.COLOR });
+
+	// bottom border
+	for (let x = LEFT; x <= boxWidth + LEFT; x++)
+		grid[bottomY][x] = new Cell({ color: DATA_SCREEN_CONFIG.GUIDES.COLOR });
+
+	// left border
+	for (let y = TOP; y <= bottomY; y++) {
+		grid[y][LEFT] = new Cell({ color: DATA_SCREEN_CONFIG.GUIDES.COLOR });
+	}
+
+	// right border
+	for (let y = TOP; y <= bottomY; y++) {
+		grid[y][rightX] = new Cell({ color: DATA_SCREEN_CONFIG.GUIDES.COLOR });
+	}
+
+	// vertical separator line
+	for (let y = TOP; y <= bottomY; y++) {
+		grid[y][DATA_SCREEN_CONFIG.GUIDES.V_SEPARATOR.COL] = new Cell({
+			color: DATA_SCREEN_CONFIG.GUIDES.COLOR,
+		});
+	}
+
+	// horizontal separator line
+	for (
+		let x = DATA_SCREEN_CONFIG.GUIDES.H_SEPARATOR.START_COL;
+		x <= rightX;
+		x++
+	) {
+		grid[DATA_SCREEN_CONFIG.GUIDES.H_SEPARATOR.ROW][x] = new Cell({
+			color: 0,
+		});
+	}
+
+	renderText("white", grid, 8, 8, DATA_SCREEN_CONFIG.COLOR.GUIDE);
+	renderText("black", grid, 8, 64, DATA_SCREEN_CONFIG.COLOR.GUIDE);
+	renderMoveHistory(moveHistory, grid);
+
+	// Render Help Values, ie. best and hint
+	const [bestMove, hintMove] = moveHelp;
+	// From manual: "Let's you know that the Chessmaster is thinking during the game."
+	renderThinkingWindow(bestMove, grid);
+	renderHint(hintMove, grid);
+
+	renderCapturedPieces(capturedPieces, grid);
+
+	return grid;
 };
