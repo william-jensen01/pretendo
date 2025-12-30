@@ -34,7 +34,11 @@ export const createStaticChessGrid = () => {
 		const offset = BOARD_MARGIN + COORDINATE_SIZE;
 
 		list.forEach((key, idx) => {
-			const charArr = presets[key];
+			const normalizedKey =
+				typeof key === "string" ? key.toUpperCase() : key;
+			const charArr = presets.getChar(normalizedKey);
+
+			if (!charArr) return;
 
 			charArr.forEach((r, rIdx) => {
 				r.forEach((c, cIdx) => {
@@ -259,14 +263,14 @@ export const renderText = (
 };
 
 const renderThinkingWindow = (bestMove, grid) => {
-	renderText("best", grid, 32, 112, DATA_SCREEN_CONFIG.COLOR.GUIDE);
+	renderText("BEST", grid, 32, 112, DATA_SCREEN_CONFIG.COLOR.GUIDE);
 	if (bestMove && bestMove.length > 0) {
 		renderText(bestMove, grid, 40, 112, DATA_SCREEN_CONFIG.COLOR.MOVE);
 	}
 };
 
 const renderHint = (hintMove, grid) => {
-	renderText("hint", grid, 8, 112, DATA_SCREEN_CONFIG.COLOR.GUIDE);
+	renderText("HINT", grid, 8, 112, DATA_SCREEN_CONFIG.COLOR.GUIDE);
 	if (hintMove && hintMove.length > 0) {
 		renderText(hintMove, grid, 16, 112, DATA_SCREEN_CONFIG.COLOR.MOVE);
 	}
@@ -408,8 +412,8 @@ export const renderDataScreen = (moveHistory, moveHelp, capturedPieces) => {
 		});
 	}
 
-	renderText("white", grid, 8, 8, DATA_SCREEN_CONFIG.COLOR.GUIDE);
-	renderText("black", grid, 8, 64, DATA_SCREEN_CONFIG.COLOR.GUIDE);
+	renderText("WHITE", grid, 8, 8, DATA_SCREEN_CONFIG.COLOR.GUIDE);
+	renderText("BLACK", grid, 8, 64, DATA_SCREEN_CONFIG.COLOR.GUIDE);
 	renderMoveHistory(moveHistory, grid);
 
 	// Render Help Values, ie. best and hint

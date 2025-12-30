@@ -7,16 +7,7 @@ export const SQUARE_PADDING = 1;
 export const SQUARE_RENDER_SIZE = SQUARE_SIZE - SQUARE_PADDING * 2;
 
 export const HORIZONTAL_AXIS = ["a", "b", "c", "d", "e", "f", "g", "h"];
-export const VERTICAL_AXIS = [
-	"eight",
-	"seven",
-	"six",
-	"five",
-	"four",
-	"three",
-	"two",
-	"one",
-];
+export const VERTICAL_AXIS = [8, 7, 6, 5, 4, 3, 2, 1];
 export const COORDINATE_CHAR_SIZE = 7;
 export const COORDINATE_SIZE = COORDINATE_CHAR_SIZE + 1;
 
