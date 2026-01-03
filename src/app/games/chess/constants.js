@@ -146,7 +146,7 @@ export const ACTION_MENU_OPTIONS = [
 	{ key: "takebackReplay", display: "Takeback/Replay", disabled: true },
 	{ key: "setupBoard", display: "Set Up Board", disabled: true },
 	{ key: "solveForMate", display: "Solve For Mate", disabled: true },
-	{ key: "offerDraw", display: "Offer Draw", disabled: true },
+	{ key: "offerDraw", display: "Offer Draw", disabled: false },
 	{ key: "loadGame", display: "Load Game", disabled: true },
 	{ key: "saveGame", display: "Save Game", disabled: true },
 	{ key: "beginNewGame", display: "Begin New Game", disabled: false },

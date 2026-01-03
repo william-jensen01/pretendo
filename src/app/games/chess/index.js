@@ -88,8 +88,15 @@ export default function Chess() {
 	const animationRef = useRef({ running: false });
 	const dataScreenRef = useRef(false);
 
-	const { isReady, bestMove, getBestMove, newGame, getHint, forceMove } =
-		useStockfish(gameSettings.level);
+	const {
+		isReady,
+		bestMove,
+		getBestMove,
+		newGame,
+		getHint,
+		forceMove,
+		offerDraw,
+	} = useStockfish(gameSettings.level);
 
 	const updateBoardCursor = useCallback(
 		(thinking) => {
@@ -155,7 +162,19 @@ export default function Chess() {
 			takebackReplay: () => {},
 			setupBoard: () => {},
 			solveForMate: () => {},
-			offerDraw: () => {},
+			offerDraw: () => {
+				setMenuPhase(0);
+				setCursor((prev) => ({ ...prev, display: true }));
+
+				const moves = historyToUCI(moveHistory);
+				offerDraw(moves, (shouldAccept, score) => {
+					if (shouldAccept) {
+						window.alert("DRAW ACCEPTED");
+					} else {
+						window.alert("DRAW REJECTED");
+					}
+				});
+			},
 			loadGame: () => {},
 			saveGame: () => {},
 			beginNewGame: () => {
@@ -173,7 +192,7 @@ export default function Chess() {
 				newGame(gameSettings.level);
 			},
 		}),
-		[newGame, gameSettings.level, forceMove]
+		[newGame, gameSettings.level, forceMove, offerDraw, moveHistory]
 	);
 
 	const loadGame = useCallback(async () => {

@@ -23,6 +23,8 @@ export const useStockfish = (skillLevel) => {
 	const bestMoveHintRef = useRef(null);
 	const hintMoveRef = useRef(null);
 
+	const drawEvaluationRef = useRef(null);
+
 	// Pending configuration
 	const pendingConfigRef = useRef(calculateStats(SKILL_LEVEL));
 	const configuredRef = useRef(false);
@@ -250,6 +252,77 @@ export const useStockfish = (skillLevel) => {
 		// searchingRef will be set to false when bestmove is received
 	}, []);
 
+	// Draw acceptance logic
+	const decideDrawAcceptance = useCallback((score) => {
+		// score is in centipawns from computer's perspective
+		// Negative = computer is losing
+		// Positive = computer is winning
+
+		// Always accept if losing badly (more than 3 pawns down)
+		if (score < -300) return true;
+
+		// Never accept if winning significantly (more than 2 pawns up)
+		if (score > 200) return false;
+
+		// In between: probability based on position
+		// Even position (±50cp): 50% chance
+		// Slightly losing (-200cp): ~80% chance
+		// Slightly winning (100cp): ~20% chance
+
+		const acceptanceThreshold = 50 - score / 4; // Maps score to 0-100 range
+		const random = Math.random() * 100;
+
+		return random < acceptanceThreshold;
+	}, []);
+
+	const offerDraw = useCallback(
+		(moves, onResponse) => {
+			if (!engineRef.current || !isReady) {
+				console.warn("Stockfish not ready");
+				return;
+			}
+
+			// Analyze current position to decide if computer accepts
+
+			const originalOnMessage = engineRef.current.onmessage;
+
+			engineRef.current.onmessage = (event) => {
+				const message = event.data;
+
+				// Look for score evaluation
+				if (message.startsWith("info") && message.includes("score")) {
+					// Extract score (cp = centipawns, mate = mate in X)
+					const cpMatch = message.match(/score cp (-?\d+)/);
+					const mateMatch = message.match(/score mate (-?\d+)/);
+
+					if (cpMatch) {
+						drawEvaluationRef.current = parseInt(cpMatch[1]);
+					} else if (mateMatch) {
+						// If mate is found, score is extremely high/low
+						const mateIn = parseInt(mateMatch[1]);
+						drawEvaluationRef.current = mateIn > 0 ? 10000 : -10000;
+					}
+				}
+
+				if (message.startsWith("bestmove")) {
+					// Restore original handler
+					engineRef.current.onmessage = originalOnMessage;
+
+					const score = drawEvaluationRef.current || 0;
+
+					const shouldAccept = decideDrawAcceptance(score);
+
+					onResponse(shouldAccept, score);
+				}
+			};
+
+			// Run evaluation
+			engineRef.current.postMessage(`position startpos moves ${moves}`);
+			engineRef.current.postMessage("go depth 8");
+		},
+		[isReady, decideDrawAcceptance]
+	);
+
 	return useMemo(
 		() => ({
 			isReady,
@@ -259,6 +332,7 @@ export const useStockfish = (skillLevel) => {
 			getHint,
 			changeDifficulty,
 			forceMove,
+			offerDraw,
 		}),
 		[
 			isReady,
@@ -268,6 +342,7 @@ export const useStockfish = (skillLevel) => {
 			getHint,
 			changeDifficulty,
 			forceMove,
+			offerDraw,
 		]
 	);
 };
