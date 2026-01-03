@@ -11,6 +11,7 @@ import {
 	NUM_RANKS,
 	NUM_FILES,
 	DATA_SCREEN_CONFIG,
+	MENU_SCREEN_CONFIG,
 } from "./constants";
 import * as presets from "./presets";
 import { useGameBoyStore } from "@/app/store/gameboy";
@@ -423,6 +424,125 @@ export const renderDataScreen = (moveHistory, moveHelp, capturedPieces) => {
 	renderHint(hintMove, grid);
 
 	renderCapturedPieces(capturedPieces, grid);
+
+	return grid;
+};
+
+// MENU SCREEN
+
+export const renderMenuScreen = (
+	phase,
+	options,
+	gameSettings,
+	selectedOption = 0
+) => {
+	const grid = create2dArray();
+
+	// set everything to be black
+	for (let r = 0; r < rows; r++) {
+		for (let c = 0; c < columns; c++) {
+			grid[r][c] = new Cell({
+				color: DATA_SCREEN_CONFIG.BACKGROUND_COLOR,
+			});
+		}
+	}
+
+	const phaseMarginBottom =
+		phase === 1
+			? MENU_SCREEN_CONFIG.ACTIONS.MARGIN_BOTTOM
+			: phase === 2
+			? MENU_SCREEN_CONFIG.SETTINGS.MARGIN_BOTTOM
+			: 0;
+
+	// Outlines
+	const width =
+		columns -
+		MENU_SCREEN_CONFIG.MARGIN.LEFT -
+		MENU_SCREEN_CONFIG.MARGIN.RIGHT +
+		1;
+
+	// Left / Right Border
+	for (
+		let y = MENU_SCREEN_CONFIG.MARGIN.TOP;
+		y <= rows - phaseMarginBottom - 1;
+		y++
+	) {
+		grid[y][MENU_SCREEN_CONFIG.MARGIN.LEFT] = new Cell({
+			color: MENU_SCREEN_CONFIG.GUIDES.COLOR,
+		});
+		grid[y][columns - MENU_SCREEN_CONFIG.MARGIN.RIGHT - 1] = new Cell({
+			color: MENU_SCREEN_CONFIG.GUIDES.COLOR,
+		});
+	}
+
+	// Top / Bottom Border
+	for (let x = MENU_SCREEN_CONFIG.MARGIN.LEFT; x <= width; x++) {
+		grid[MENU_SCREEN_CONFIG.MARGIN.TOP][x] = new Cell({
+			color: MENU_SCREEN_CONFIG.GUIDES.COLOR,
+		});
+		grid[rows - phaseMarginBottom - 1][x] = new Cell({
+			color: MENU_SCREEN_CONFIG.GUIDES.COLOR,
+		});
+	}
+
+	// Separator
+	for (let x = MENU_SCREEN_CONFIG.MARGIN.LEFT; x <= width; x++) {
+		grid[MENU_SCREEN_CONFIG.GUIDES.H_SEPARATOR.ROW][x] = new Cell({
+			color: MENU_SCREEN_CONFIG.GUIDES.COLOR,
+		});
+	}
+
+	renderText("THE CHESSMASTER", grid, 8, 24, MENU_SCREEN_CONFIG.COLOR.TITLE);
+	if (phase === 1) {
+		renderText("Actions", grid, 24, 56, MENU_SCREEN_CONFIG.COLOR.SUBMENU);
+	} else if (phase === 2) {
+		renderText("Settings", grid, 24, 48, MENU_SCREEN_CONFIG.COLOR.SUBMENU);
+	}
+
+	// Render the menu options and the arrow on selected option
+	options &&
+		options.length > 0 &&
+		options.forEach((s, idx) => {
+			const split = s.display.split(".");
+			let name = s.display;
+			if (split.length > 1 && s.values) {
+				const currentValue = gameSettings[s.key];
+				const valueIndex = s.values.indexOf(currentValue);
+				// Use label if available, otherwise use the raw value
+				const displayValue = s.labels
+					? s.labels[valueIndex]
+					: currentValue;
+				name = split.join(displayValue ?? "");
+			}
+
+			const oRow = 40 + idx * 8;
+			const oCol = 16;
+			renderText(
+				name,
+				grid,
+				oRow,
+				oCol,
+				MENU_SCREEN_CONFIG.COLOR.OPTIONS
+			);
+
+			// Render a strikethrough on disabled options
+			if (s.disabled) {
+				for (let i = oCol; i < name.length * 8 + oCol; i++) {
+					grid[oRow + 3][i] = new Cell({
+						color: 2,
+					});
+					grid[oRow + 4][i] = new Cell({ color: 2 });
+				}
+			}
+
+			// Render arrow pointer at this row
+			if (selectedOption === idx) {
+				renderPieceAt(grid, presets["arrow"], {
+					row: oRow,
+					col: 8,
+				});
+			}
+		});
 
 	return grid;
 };

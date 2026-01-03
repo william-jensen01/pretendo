@@ -7,6 +7,8 @@ import {
 	NUM_RANKS,
 	HORIZONTAL_AXIS,
 	ANIMATION_SPEED,
+	SETTINGS_MENU_OPTIONS,
+	ACTION_MENU_OPTIONS,
 } from "./constants";
 import {
 	createStaticChessGrid,
@@ -15,6 +17,7 @@ import {
 	deepCopyBoard,
 	renderPieceAt,
 	renderDataScreen,
+	renderMenuScreen,
 } from "./util";
 import * as presets from "./presets";
 import { useGameBoyStore } from "@/app/store/gameboy";
@@ -62,9 +65,29 @@ export default function Chess() {
 	const [moveHistory, setMoveHistory] = useState([]);
 	const [capturedPieces, setCapturedPieces] = useState([]);
 	const [moveHelp, setMoveHelp] = useState([]); // [best, hint] moves
+	const [gameSettings, setGameSettings] = useState({
+		// From actions menu
+		humanPlayers: 1,
+		// From settings menu
+		mateInMoves: 1,
+		level: 1,
+		deepThinking: true,
+		openingBook: true,
+		teachingMode: false,
+		coordinates: true,
+		chessClock: false,
+		touchingRule: false,
+		whiteVisible: true,
+		blackVisible: true,
+		whitePosition: "bottom",
+	});
+	const [menuOptions, setMenuOptions] = useState(null);
+	const [selectedOption, setSelectedOption] = useState(0);
+	const [menuPhase, setMenuPhase] = useState(0);
 	const animatingPieceRef = useRef(null);
 	const animationRef = useRef({ running: false });
 	const dataScreenRef = useRef(false);
+	const menuScreenRef = useRef(0);
 
 	const { isReady, bestMove, getBestMove, newGame, getHint } = useStockfish();
 
@@ -110,6 +133,21 @@ export default function Chess() {
 			);
 		},
 		[board, currentPlayer, getLastMove]
+	);
+
+	const menuActions = useMemo(
+		() => ({
+			changeSides: () => {},
+			forceMove: () => {},
+			takebackReplay: () => {},
+			setupBoard: () => {},
+			solveForMate: () => {},
+			offerDraw: () => {},
+			loadGame: () => {},
+			saveGame: () => {},
+			beginNewGame: () => {},
+		}),
+		[]
 	);
 
 	const loadGame = useCallback(async () => {
@@ -166,8 +204,16 @@ export default function Chess() {
 					col: nCol,
 				};
 			});
+
+			// If in menu screen, change selected setting and update screen
+			if (menuPhase === 1 || menuPhase === 2) {
+				setSelectedOption(
+					(selectedOption + r + menuOptions.length) %
+						menuOptions.length
+				);
+			}
 		},
-		[setCursor]
+		[setCursor, menuOptions, selectedOption, menuPhase]
 	);
 
 	// Build grid with current animation state
@@ -379,8 +425,39 @@ export default function Chess() {
 		]
 	);
 
+	const handleMenuAction = useCallback(
+		(e) => {
+			if (
+				(menuPhase !== 1 && menuPhase !== 2) ||
+				e.currentTarget.id !== "a"
+			)
+				return;
+
+			const option = menuOptions[selectedOption];
+			if (!option || option?.disabled) return;
+
+			// Value-cycling option
+			if (option.hasOwnProperty("values") && option.values) {
+				setGameSettings((prev) => {
+					const currentIndex = option.values.indexOf(
+						prev[option.key]
+					);
+					const nextIndex = (currentIndex + 1) % option.values.length;
+					return { ...prev, [option.key]: option.values[nextIndex] };
+				});
+			}
+			// Action option
+			else if (menuActions[option.key]) {
+				menuActions[option.key]();
+			}
+		},
+		[menuOptions, selectedOption, menuActions, menuPhase]
+	);
+
 	const handleGameAction = useCallback(
 		(e) => {
+			handleMenuAction(e);
+
 			// Prevent interaction during computer's turn
 			if (currentPlayer === computerColor) return;
 
@@ -455,10 +532,34 @@ export default function Chess() {
 			currentPlayer,
 			getLastMove,
 			computerColor,
+			handleMenuAction,
 		]
 	);
 
-	const handleGameSelect = useCallback(() => {}, []);
+	const handleGameSelect = useCallback(() => {
+		// Don't run if animation is ongoing or data screen is open
+		if (animationRef.current.running || dataScreenRef.current) return;
+
+		if (menuPhase === 0) {
+			// Render action menu
+			setMenuOptions(ACTION_MENU_OPTIONS);
+			setMenuPhase(1);
+			setCursor((prev) => ({ ...prev, display: false }));
+		} else if (menuPhase === 1) {
+			// Render settings menu
+			setMenuOptions(SETTINGS_MENU_OPTIONS);
+			setMenuPhase(2);
+			setCursor((prev) => ({ ...prev, display: false }));
+		} else if (menuPhase === 2) {
+			// Close menu
+			setMenuOptions(null);
+			setMenuPhase(0);
+			setCursor((prev) => ({ ...prev, display: true }));
+			setBoard(board.map((row) => [...row]));
+		}
+
+		setSelectedOption(0);
+	}, [board, menuActions, menuPhase]);
 
 	const handleGameStart = useCallback(() => {}, []);
 
@@ -575,6 +676,26 @@ export default function Chess() {
 		if (initializing || !hasTitled) return; // don't run if console is initializing or game hasn't loaded yet
 		setGrid(boardGrid);
 	}, [initializing, hasTitled, setGrid, boardGrid]);
+
+	useEffect(() => {
+		if (initializing || !hasTitled || (menuPhase !== 1 && menuPhase !== 2))
+			return;
+
+		const menuGrid = renderMenuScreen(
+			menuPhase,
+			menuOptions,
+			gameSettings,
+			selectedOption
+		);
+		setGrid(menuGrid);
+	}, [
+		initializing,
+		hasTitled,
+		menuPhase,
+		menuOptions,
+		gameSettings,
+		selectedOption,
+	]);
 
 	useEffect(() => {
 		setGameState({

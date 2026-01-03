@@ -35,6 +35,17 @@ export const thinking = [
 	[0, 0, 3, 3, 3, 3, 3, 3, 3, 3, 0, 0],
 ];
 
+export const arrow = [
+	[0, 0, 3, 3, 0, 0, 0, 0],
+	[0, 0, 3, 1, 3, 0, 0, 0],
+	[3, 1, 1, 1, 1, 3, 0, 0],
+	[3, 1, 1, 1, 1, 1, 3, 0],
+	[3, 1, 1, 1, 1, 3, 0, 0],
+	[0, 0, 3, 1, 3, 0, 0, 0],
+	[0, 0, 3, 3, 0, 0, 0, 0],
+	[0, 0, 0, 0, 0, 0, 0, 0],
+];
+
 // Letter and Number presets are boolean where color is assigned after
 // 0: dead, 1: alive
 

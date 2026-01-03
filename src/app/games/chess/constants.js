@@ -107,3 +107,125 @@ export const DATA_SCREEN_CONFIG = {
 		},
 	},
 };
+
+export const MENU_SCREEN_CONFIG = {
+	BACKGROUND_COLOR: 3,
+	MARGIN: {
+		TOP: 16 + 3,
+		RIGHT: 4,
+		LEFT: 3,
+	},
+	ACTIONS: {
+		MARGIN_BOTTOM: 16 + 4,
+	},
+	SETTINGS: {
+		MARGIN_BOTTOM: 8 + 4,
+	},
+	COLOR: {
+		TITLE: 1,
+		SUBMENU: 2,
+		OPTIONS: 2,
+	},
+	GUIDES: {
+		COLOR: 0, // actual color value
+		H_SEPARATOR: {
+			ROW: 32 + 3,
+		},
+	},
+};
+
+export const ACTION_MENU_OPTIONS = [
+	{
+		key: "humanPlayers",
+		display: "Human Players: .",
+		values: [0, 1, 2],
+		disabled: true,
+	},
+	{ key: "changeSides", display: "Change Sides", disabled: true },
+	{ key: "forceMove", display: "Force Move", disabled: true },
+	{ key: "takebackReplay", display: "Takeback/Replay", disabled: true },
+	{ key: "setupBoard", display: "Set Up Board", disabled: true },
+	{ key: "solveForMate", display: "Solve For Mate", disabled: true },
+	{ key: "offerDraw", display: "Offer Draw", disabled: true },
+	{ key: "loadGame", display: "Load Game", disabled: true },
+	{ key: "saveGame", display: "Save Game", disabled: true },
+	{ key: "beginNewGame", display: "Begin New Game", disabled: true },
+];
+
+export const SETTINGS_MENU_OPTIONS = [
+	{
+		key: "mateInMoves",
+		display: "Mate In . Moves",
+		values: [1, 2, 3, 4, 5],
+		disabled: true,
+	},
+	{
+		key: "level",
+		display: "Level: .",
+		values: Array.from({ length: 20 }, (_, i) => i + 1),
+		disabled: true,
+	},
+	{
+		key: "deepThinking",
+		display: "Deep Thinking .",
+		values: [true, false],
+		labels: ["On", "Off"],
+		disabled: true,
+	},
+	{
+		key: "openingBook",
+		display: "Opening Book .",
+		values: [true, false],
+		labels: ["On", "Off"],
+		disabled: true,
+	},
+	{
+		key: "teachingMode",
+		display: "Teaching Mode .",
+		values: [true, false],
+		labels: ["On", "Off"],
+		disabled: true,
+	},
+	{
+		key: "coordinates",
+		display: "Coordinates .",
+		values: [true, false],
+		labels: ["On", "Off"],
+		disabled: true,
+	},
+	{
+		key: "chessClock",
+		display: "Chess Clock .",
+		values: [true, false],
+		labels: ["On", "Off"],
+		disabled: true,
+	},
+	{
+		key: "touchingRule",
+		display: "Touching Rule .",
+		values: [true, false],
+		labels: ["On", "Off"],
+		disabled: true,
+	},
+	{
+		key: "whiteVisible",
+		display: "White .",
+		values: [true, false],
+		labels: ["Visible", "Hidden"],
+		disabled: true,
+	},
+	{
+		key: "blackVisible",
+		display: "Black .",
+		values: [true, false],
+		labels: ["Visible", "Hidden"],
+		disabled: true,
+	},
+	{
+		key: "whitePosition",
+		display: "White On .",
+		values: ["bottom", "left", "top", "right"],
+		labels: ["Bottom", "Left", "Top", "Right"],
+		disabled: true,
+	},
+];
