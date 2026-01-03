@@ -155,9 +155,22 @@ export default function Chess() {
 			offerDraw: () => {},
 			loadGame: () => {},
 			saveGame: () => {},
-			beginNewGame: () => {},
+			beginNewGame: () => {
+				setMenuPhase(0);
+				setBoard(DEFAULT_BOARD);
+				setSelectedSquare(null);
+				setPossibleMoves([]);
+				setCurrentPlayer(Color.White);
+				setComputerColor(Color.Black);
+				setMoveHistory([]);
+				setCapturedPieces([]);
+				setMoveHelp([]);
+				setCursor(() => ({ ...initialCursor, display: true }));
+
+				newGame(gameSettings.level);
+			},
 		}),
-		[]
+		[newGame, gameSettings.level]
 	);
 
 	const loadGame = useCallback(async () => {

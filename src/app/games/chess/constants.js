@@ -149,7 +149,7 @@ export const ACTION_MENU_OPTIONS = [
 	{ key: "offerDraw", display: "Offer Draw", disabled: true },
 	{ key: "loadGame", display: "Load Game", disabled: true },
 	{ key: "saveGame", display: "Save Game", disabled: true },
-	{ key: "beginNewGame", display: "Begin New Game", disabled: true },
+	{ key: "beginNewGame", display: "Begin New Game", disabled: false },
 ];
 
 export const SETTINGS_MENU_OPTIONS = [
