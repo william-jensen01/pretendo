@@ -501,7 +501,10 @@ export default function Chess() {
 
 	const handleGameAction = useCallback(
 		(e) => {
-			handleMenuAction(e);
+			if (menuPhase !== 0) {
+				handleMenuAction(e);
+				return;
+			}
 
 			// Prevent interaction during computer's turn
 			if (currentPlayer === computerColor) return;
@@ -577,6 +580,7 @@ export default function Chess() {
 			currentPlayer,
 			getLastMove,
 			computerColor,
+			menuPhase,
 			handleMenuAction,
 		]
 	);
