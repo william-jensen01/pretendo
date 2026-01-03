@@ -163,7 +163,7 @@ export const SETTINGS_MENU_OPTIONS = [
 		key: "level",
 		display: "Level: .",
 		values: Array.from({ length: 20 }, (_, i) => i + 1),
-		disabled: true,
+		disabled: false,
 	},
 	{
 		key: "deepThinking",

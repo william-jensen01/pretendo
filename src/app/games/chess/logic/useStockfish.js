@@ -10,7 +10,7 @@ const calculateStats = (skillLevel) => {
 	};
 };
 
-export const useStockfish = () => {
+export const useStockfish = (skillLevel) => {
 	const engineRef = useRef(null);
 	const [isReady, setIsReady] = useState(false);
 	const pendingRequestRef = useRef(false);
@@ -141,6 +141,27 @@ export const useStockfish = () => {
 		}
 	}, []);
 
+	const changeDifficulty = useCallback(
+		(newSkillLevel) => {
+			if (!engineRef.current || !isReady) return;
+
+			// Update configuration
+			pendingConfigRef.current = calculateStats(newSkillLevel);
+			configuredRef.current = false;
+
+			stopSearch();
+			applyConfig();
+
+			// Engine is now at new difficulty, ready for next move
+			// Move history and board state are preserved
+		},
+		[isReady, stopSearch, applyConfig]
+	);
+
+	useEffect(() => {
+		changeDifficulty(skillLevel);
+	}, [skillLevel, changeDifficulty]);
+
 	const newGame = useCallback(
 		(skillLevel = SKILL_LEVEL) => {
 			pendingConfigRef.current = calculateStats(skillLevel);
@@ -224,7 +245,8 @@ export const useStockfish = () => {
 			newGame,
 			stopSearch,
 			getHint,
+			changeDifficulty,
 		}),
-		[isReady, getBestMove, newGame, stopSearch, getHint]
+		[isReady, getBestMove, newGame, stopSearch, getHint, changeDifficulty]
 	);
 };

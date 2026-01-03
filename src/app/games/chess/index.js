@@ -87,9 +87,10 @@ export default function Chess() {
 	const animatingPieceRef = useRef(null);
 	const animationRef = useRef({ running: false });
 	const dataScreenRef = useRef(false);
-	const menuScreenRef = useRef(0);
 
-	const { isReady, bestMove, getBestMove, newGame, getHint } = useStockfish();
+	const { isReady, bestMove, getBestMove, newGame, getHint } = useStockfish(
+		gameSettings.level
+	);
 
 	const updateBoardCursor = useCallback(
 		(thinking) => {
