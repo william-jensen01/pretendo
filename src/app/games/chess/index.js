@@ -718,9 +718,9 @@ export default function Chess() {
 	}, []);
 
 	useEffect(() => {
-		if (initializing || !hasTitled) return; // don't run if console is initializing or game hasn't loaded yet
+		if (initializing || !hasTitled || menuPhase !== 0) return; // don't run if console is initializing or game hasn't loaded yet || menu is open
 		setGrid(boardGrid);
-	}, [initializing, hasTitled, setGrid, boardGrid]);
+	}, [initializing, hasTitled, setGrid, boardGrid, menuPhase]);
 
 	useEffect(() => {
 		if (initializing || !hasTitled || (menuPhase !== 1 && menuPhase !== 2))
