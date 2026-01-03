@@ -138,7 +138,16 @@ export default function Chess() {
 
 	const menuActions = useMemo(
 		() => ({
-			changeSides: () => {},
+			changeSides: () => {
+				setMenuPhase(0);
+				setCursor((prev) => ({ ...prev, display: true }));
+
+				setTimeout(() => {
+					setComputerColor((prev) =>
+						prev === Color.White ? Color.Black : Color.White
+					);
+				}, 0);
+			},
 			forceMove: () => {},
 			takebackReplay: () => {},
 			setupBoard: () => {},

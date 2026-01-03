@@ -141,7 +141,7 @@ export const ACTION_MENU_OPTIONS = [
 		values: [0, 1, 2],
 		disabled: true,
 	},
-	{ key: "changeSides", display: "Change Sides", disabled: true },
+	{ key: "changeSides", display: "Change Sides", disabled: false },
 	{ key: "forceMove", display: "Force Move", disabled: true },
 	{ key: "takebackReplay", display: "Takeback/Replay", disabled: true },
 	{ key: "setupBoard", display: "Set Up Board", disabled: true },
