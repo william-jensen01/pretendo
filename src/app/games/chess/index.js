@@ -88,9 +88,8 @@ export default function Chess() {
 	const animationRef = useRef({ running: false });
 	const dataScreenRef = useRef(false);
 
-	const { isReady, bestMove, getBestMove, newGame, getHint } = useStockfish(
-		gameSettings.level
-	);
+	const { isReady, bestMove, getBestMove, newGame, getHint, forceMove } =
+		useStockfish(gameSettings.level);
 
 	const updateBoardCursor = useCallback(
 		(thinking) => {
@@ -148,7 +147,11 @@ export default function Chess() {
 					);
 				}, 0);
 			},
-			forceMove: () => {},
+			forceMove: () => {
+				setMenuPhase(0);
+				setCursor((prev) => ({ ...prev, display: true }));
+				forceMove();
+			},
 			takebackReplay: () => {},
 			setupBoard: () => {},
 			solveForMate: () => {},
@@ -170,7 +173,7 @@ export default function Chess() {
 				newGame(gameSettings.level);
 			},
 		}),
-		[newGame, gameSettings.level]
+		[newGame, gameSettings.level, forceMove]
 	);
 
 	const loadGame = useCallback(async () => {

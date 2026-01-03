@@ -238,6 +238,18 @@ export const useStockfish = (skillLevel) => {
 		[isReady, stopSearch]
 	);
 
+	const forceMove = useCallback(() => {
+		if (!engineRef.current || !searchingRef.current) {
+			console.warn("No search in progress to force");
+			return;
+		}
+
+		// Stop the search - Stockfish will immediately return bestmove
+		engineRef.current.postMessage("stop");
+
+		// searchingRef will be set to false when bestmove is received
+	}, []);
+
 	return useMemo(
 		() => ({
 			isReady,
@@ -246,7 +258,16 @@ export const useStockfish = (skillLevel) => {
 			stopSearch,
 			getHint,
 			changeDifficulty,
+			forceMove,
 		}),
-		[isReady, getBestMove, newGame, stopSearch, getHint, changeDifficulty]
+		[
+			isReady,
+			getBestMove,
+			newGame,
+			stopSearch,
+			getHint,
+			changeDifficulty,
+			forceMove,
+		]
 	);
 };
