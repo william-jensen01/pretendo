@@ -552,7 +552,7 @@ export default function Chess() {
 				} else {
 					// SELECT / PICKUP PIECE
 					const piece = hoveredSquare.piece;
-					if (piece) {
+					if (piece && piece.color !== computerColor) {
 						setSelectedSquare(hoveredSquare);
 						setPossibleMoves(getPossibleMoves(hoveredSquare));
 						setCursor((prev) => ({
@@ -578,6 +578,7 @@ export default function Chess() {
 			setCursor,
 			getPossibleMoves,
 			currentPlayer,
+			computerColor,
 			getLastMove,
 			computerColor,
 			menuPhase,
