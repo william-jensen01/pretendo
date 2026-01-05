@@ -29,6 +29,9 @@ import {
 	isStalemate,
 	isInCheck,
 	isValidMove,
+	determineSpecialMove,
+	applyMoveToBoard,
+	reverseMoveOnBoard,
 } from "./logic";
 import { Pawn, Queen } from "./logic/pieces";
 import Cell from "@/app/Cell";
@@ -84,9 +87,11 @@ export default function Chess() {
 	const [menuOptions, setMenuOptions] = useState(null);
 	const [selectedOption, setSelectedOption] = useState(0);
 	const [menuPhase, setMenuPhase] = useState(0);
+	const [replayMode, setReplayMode] = useState(false);
 	const animatingPieceRef = useRef(null);
 	const animationRef = useRef({ running: false });
 	const dataScreenRef = useRef(false);
+	const redoMoveStackRef = useRef([]); // Stores undone moves
 
 	const {
 		isReady,
@@ -100,13 +105,13 @@ export default function Chess() {
 
 	const updateBoardCursor = useCallback(
 		(thinking) => {
-			if (!hasTitled) return;
+			if (!hasTitled || replayMode) return;
 			setCursor((prev) => ({
 				...prev,
 				cells: thinking ? presets.thinking : presets.cursor,
 			}));
 		},
-		[hasTitled]
+		[hasTitled, replayMode]
 	);
 
 	// Compute grid based on board and state
@@ -159,7 +164,11 @@ export default function Chess() {
 				setCursor((prev) => ({ ...prev, display: true }));
 				forceMove();
 			},
-			takebackReplay: () => {},
+			takebackReplay: () => {
+				setMenuPhase(0);
+				setReplayMode(true);
+				setCursor((prev) => ({ ...prev, display: true }));
+			},
 			setupBoard: () => {},
 			solveForMate: () => {},
 			offerDraw: () => {
@@ -359,83 +368,112 @@ export default function Chess() {
 	);
 
 	const applyBoardUpdate = useCallback(
-		(newBoard, nextPlayer, lastMove) => {
-			setMoveHistory((prev) => [...prev, lastMove]);
+		(newBoard, nextPlayer, lastMove, isUndoLastMove = false) => {
+			setMoveHistory((prev) => {
+				if (isUndoLastMove) {
+					return prev.slice(0, -1);
+				}
+				return [...prev, lastMove];
+			});
 			setBoard(newBoard);
 			setCurrentPlayer(nextPlayer);
 			setSelectedSquare(null);
 			setPossibleMoves([]);
 			updateBoardCursor(false);
-			if (lastMove.captured)
-				setCapturedPieces((prev) => [...prev, lastMove.captured]);
-
-			// Check game status
-			if (isCheckmate(nextPlayer, newBoard)) {
-				window.alert(
-					`${nextPlayer === Color.White ? "Black" : "White"} wins!`
-				);
-			} else if (isStalemate(nextPlayer, newBoard)) {
-				window.alert("Draw by stalemate");
-			} else if (isInCheck(nextPlayer, newBoard)) {
-				window.alert(
-					`${
-						nextPlayer === Color.White ? "White" : "Black"
-					} is in check`
-				);
-			}
-		},
-		[updateBoardCursor]
-	);
-
-	const makeMove = useCallback(
-		(from, to, promotionPiece = null) => {
-			console.log("makeMove", { from, to, promotionPiece });
-			const newBoard = deepCopyBoard(board);
-			const piece = newBoard[from.row][from.col];
-			const capturedPiece = newBoard[to.row][to.col];
-
-			// Handle en passant
-			if (
-				piece._type === "pawn" &&
-				from.col !== to.col &&
-				!capturedPiece
-			) {
-				newBoard[from.row][to.col] = null;
-			}
-
-			// Handle castling
-			if (piece._type === "king" && Math.abs(to.col - from.col) === 2) {
-				const direction = to.col > from.col ? 1 : -1;
-				const rookCol = direction === 1 ? 7 : 0;
-				const newRookCol = from.col + direction;
-
-				const rook = newBoard[to.row][rookCol];
-				newBoard[from.row][newRookCol] = rook;
-				newBoard[from.row][rookCol] = null;
-				if (rook && rook.hasMoved !== undefined) {
-					rook.hasMoved = true;
+			// Handle captured pieces based on whether we're undoing or making a move
+			if (lastMove.captured) {
+				if (isUndoLastMove) {
+					// When undoing, remove the captured piece from the array
+					setCapturedPieces((prev) => {
+						// Find and remove the last occurrence of the captured piece
+						const index = prev.findLastIndex(
+							(p) => p === lastMove.captured
+						);
+						if (index !== -1) {
+							return [
+								...prev.slice(0, index),
+								...prev.slice(index + 1),
+							];
+						}
+						return prev;
+					});
+				} else {
+					// When making a move or redoing, add the captured piece
+					setCapturedPieces((prev) => [...prev, lastMove.captured]);
 				}
 			}
 
-			// Handle promotion
+			if (isUndoLastMove) {
+				redoMoveStackRef.current.push(lastMove);
+			}
+
+			// Suppress game status checks when in replay mode
+			if (!replayMode) {
+				// Check game status
+				if (isCheckmate(nextPlayer, newBoard)) {
+					window.alert(
+						`${
+							nextPlayer === Color.White ? "Black" : "White"
+						} wins!`
+					);
+				} else if (isStalemate(nextPlayer, newBoard)) {
+					window.alert("Draw by stalemate");
+				} else if (isInCheck(nextPlayer, newBoard)) {
+					window.alert(
+						`${
+							nextPlayer === Color.White ? "White" : "Black"
+						} is in check`
+					);
+				}
+			}
+		},
+		[updateBoardCursor, replayMode]
+	);
+
+	const makeMove = useCallback(
+		(from, to) => {
+			console.log("makeMove", { from, to });
+			const newBoard = deepCopyBoard(board);
+			const piece = newBoard[from.row][from.col];
+			const capturedPiece = newBoard[to.row][to.col];
+			const originalHasMoved =
+				piece.hasMoved !== undefined ? piece.hasMoved : null;
+
+			const specialMove = determineSpecialMove(
+				piece,
+				from,
+				to,
+				capturedPiece
+			);
+
+			// Store original rook hasMoved state for castling
+			let originalRookHasMoved = null;
+			if (specialMove === "castle") {
+				const direction = to.col > from.col ? 1 : -1;
+				const rookCol = direction === 1 ? 7 : 0;
+				const rook = newBoard[from.row][rookCol];
+				originalRookHasMoved =
+					rook?.hasMoved !== undefined ? rook.hasMoved : null;
+			}
+
+			// Handle promotion - create the promoted piece
 			// Todo: add piece selection (queen, rook, bishop, or knight)
 			const PromotionClass = Queen;
-			let promotionFENChar;
-			if (promotionPiece) {
-				const PromotionPiece = new PromotionClass(piece.color);
-				newBoard[to.row][to.col] = PromotionPiece;
-				promotionFENChar = PromotionPiece.FENChar;
-			} else {
-				// Move piece
-				newBoard[to.row][to.col] = piece;
+			let promotionPiece = null;
+			let promotionFENChar = "";
+			if (specialMove === "promotion") {
+				promotionPiece = new PromotionClass(piece.color);
+				promotionFENChar = promotionPiece.FENChar;
 			}
 
-			newBoard[from.row][from.col] = null;
-
-			// Update hasMoved flag if piece has it
-			if (piece && piece.hasMoved !== undefined) {
-				piece.hasMoved = true;
-			}
+			// Apply the move using consolidated logic
+			applyMoveToBoard(newBoard, {
+				from,
+				to,
+				piece,
+				special: specialMove,
+				promotionPiece,
+			});
 
 			const nextPlayer =
 				currentPlayer === Color.White ? Color.Black : Color.White;
@@ -445,13 +483,14 @@ export default function Chess() {
 				to,
 				piece,
 				captured: capturedPiece,
-				notation: `${from.file}${from.rank}${to.file}${to.rank}${
-					promotionFENChar ? promotionFENChar : ""
-				}`,
+				notation: `${from.file}${from.rank}${to.file}${to.rank}${promotionFENChar}`,
 				display: `${from.file}${from.rank}-${to.file}${to.rank}`,
+				special: specialMove,
+				originalHasMoved,
+				originalRookHasMoved,
 			};
 
-			// Only animate the computer's turn'
+			// Only animate the computer's turn
 			if (currentPlayer === computerColor) {
 				// Animate, then apply board update
 				animatePieceMove(piece, from, to, () =>
@@ -469,6 +508,60 @@ export default function Chess() {
 			applyBoardUpdate,
 		]
 	);
+
+	const undoLastMove = useCallback(() => {
+		if (moveHistory.length === 0) {
+			window.alert("NO MORE MOVES TO TAKE BACK");
+			return;
+		}
+
+		const lastMoveEntry = moveHistory[moveHistory.length - 1];
+		const newBoard = deepCopyBoard(board);
+
+		// Reverse the move using consolidated logic
+		reverseMoveOnBoard(newBoard, lastMoveEntry);
+
+		animatePieceMove(
+			lastMoveEntry.piece,
+			lastMoveEntry.to,
+			lastMoveEntry.from,
+			() =>
+				applyBoardUpdate(
+					newBoard,
+					lastMoveEntry.piece.color,
+					lastMoveEntry,
+					true
+				)
+		);
+	}, [moveHistory, board, applyBoardUpdate, animatePieceMove]);
+
+	const redoLastMove = useCallback(() => {
+		if (redoMoveStackRef.current.length === 0) {
+			window.alert("NO MORE MOVES TO REPLAY");
+			return;
+		}
+
+		const moveToRedo = redoMoveStackRef.current.pop();
+		const newBoard = deepCopyBoard(board);
+
+		// Handle promotion - re-specify the piece selection (defaults to Queen for now)
+		if (moveToRedo.special === "promotion") {
+			const PromotionClass = Queen;
+			moveToRedo.promotionPiece = new PromotionClass(
+				moveToRedo.piece.color
+			);
+		}
+
+		// Apply the move forward using consolidated logic
+		applyMoveToBoard(newBoard, moveToRedo);
+
+		const nextPlayer =
+			moveToRedo.piece.color === Color.White ? Color.Black : Color.White;
+
+		animatePieceMove(moveToRedo.piece, moveToRedo.from, moveToRedo.to, () =>
+			applyBoardUpdate(newBoard, nextPlayer, moveToRedo)
+		);
+	}, [board, applyBoardUpdate, animatePieceMove]);
 
 	const handleMenuAction = useCallback(
 		(e) => {
@@ -499,6 +592,42 @@ export default function Chess() {
 		[menuOptions, selectedOption, menuActions, menuPhase]
 	);
 
+	const handleReplayGameAction = useCallback(
+		(e) => {
+			// Intentional alternate way to open replay mode (main is through action menu)
+			if (
+				!menuPhase &&
+				!selectedSquare &&
+				e.currentTarget.id === "b" &&
+				!dataScreenRef.current &&
+				!replayMode
+			) {
+				setReplayMode(true);
+				return true;
+			}
+
+			if (
+				replayMode &&
+				e.currentTarget.id === "b" &&
+				!animatingPieceRef.current
+			) {
+				undoLastMove();
+				return true;
+			}
+			if (
+				replayMode &&
+				e.currentTarget.id === "a" &&
+				!animatingPieceRef.current
+			) {
+				redoLastMove();
+				return true;
+			}
+
+			return false;
+		},
+		[replayMode, menuPhase, selectedSquare, undoLastMove, redoLastMove]
+	);
+
 	const handleGameAction = useCallback(
 		(e) => {
 			if (menuPhase !== 0) {
@@ -506,8 +635,11 @@ export default function Chess() {
 				return;
 			}
 
+			const exit = handleReplayGameAction(e);
+			if (exit) return;
+
 			// Prevent interaction during computer's turn
-			if (currentPlayer === computerColor) return;
+			if (currentPlayer === computerColor || replayMode) return;
 
 			if (e.currentTarget.id === "a") {
 				// find square closest to cursor
@@ -525,10 +657,6 @@ export default function Chess() {
 						isValidMove(piece, from, to, board, gameState) &&
 						piece.color === currentPlayer
 					) {
-						// Check for pawn promotion
-						if (piece instanceof Pawn && piece.isPromotion(to)) {
-							return makeMove(from, to, true);
-						}
 						makeMove(from, to);
 					} else {
 						// Select new piece if clicking on own piece
@@ -583,6 +711,8 @@ export default function Chess() {
 			computerColor,
 			menuPhase,
 			handleMenuAction,
+			replayMode,
+			handleReplayGameAction,
 		]
 	);
 
@@ -590,17 +720,17 @@ export default function Chess() {
 		// Don't run if animation is ongoing or data screen is open
 		if (animationRef.current.running || dataScreenRef.current) return;
 
-		if (menuPhase === 0) {
+		if (menuPhase === 0 && !replayMode) {
 			// Render action menu
 			setMenuOptions(ACTION_MENU_OPTIONS);
 			setMenuPhase(1);
 			setCursor((prev) => ({ ...prev, display: false }));
-		} else if (menuPhase === 1) {
+		} else if (menuPhase === 1 && !replayMode) {
 			// Render settings menu
 			setMenuOptions(SETTINGS_MENU_OPTIONS);
 			setMenuPhase(2);
 			setCursor((prev) => ({ ...prev, display: false }));
-		} else if (menuPhase === 2) {
+		} else if (menuPhase === 2 && !replayMode) {
 			// Close menu
 			setMenuOptions(null);
 			setMenuPhase(0);
@@ -609,7 +739,12 @@ export default function Chess() {
 		}
 
 		setSelectedOption(0);
-	}, [board, menuActions, menuPhase]);
+
+		if (replayMode) {
+			setReplayMode(false);
+			redoMoveStackRef.current = [];
+		}
+	}, [board, menuActions, menuPhase, replayMode]);
 
 	const handleGameStart = useCallback(() => {}, []);
 
@@ -659,7 +794,13 @@ export default function Chess() {
 
 	// Request and execute computer move in one place
 	useEffect(() => {
-		if (!hasTitled || currentPlayer !== computerColor || !isReady) return;
+		if (
+			!hasTitled ||
+			currentPlayer !== computerColor ||
+			!isReady ||
+			replayMode
+		)
+			return;
 
 		updateBoardCursor(true);
 
@@ -703,8 +844,7 @@ export default function Chess() {
 			// get hint with new move
 			getHint(moves + " " + notation, (info) => setMoveHelp(info));
 
-			const isPromotion = piece instanceof Pawn && piece.isPromotion(to);
-			makeMove(from, to, isPromotion || promotion);
+			makeMove(from, to);
 		});
 	}, [
 		hasTitled,
@@ -715,12 +855,23 @@ export default function Chess() {
 		updateBoardCursor,
 		getBestMove,
 		makeMove,
+		replayMode,
 	]);
 
 	useEffect(() => {
 		// Set cursor to initial state, will update display status when game is loaded
 		setCursor(() => ({ ...initialCursor }));
 	}, []);
+
+	// Takeback/Replay - update cursor cells based on replay mode
+	useEffect(() => {
+		if (initializing || !hasTitled) return;
+		setCursor((prev) => ({
+			...prev,
+			display: true,
+			cells: replayMode ? presets.takebackReplay : presets.cursor,
+		}));
+	}, [initializing, hasTitled, replayMode]);
 
 	useEffect(() => {
 		if (initializing || !hasTitled || menuPhase !== 0) return; // don't run if console is initializing or game hasn't loaded yet || menu is open

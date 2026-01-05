@@ -143,7 +143,7 @@ export const ACTION_MENU_OPTIONS = [
 	},
 	{ key: "changeSides", display: "Change Sides", disabled: false },
 	{ key: "forceMove", display: "Force Move", disabled: false },
-	{ key: "takebackReplay", display: "Takeback/Replay", disabled: true },
+	{ key: "takebackReplay", display: "Takeback/Replay", disabled: false },
 	{ key: "setupBoard", display: "Set Up Board", disabled: true },
 	{ key: "solveForMate", display: "Solve For Mate", disabled: true },
 	{ key: "offerDraw", display: "Offer Draw", disabled: false },
