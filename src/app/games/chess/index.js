@@ -1,4 +1,11 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import {
+	useState,
+	useCallback,
+	useEffect,
+	useRef,
+	useMemo,
+	useReducer,
+} from "react";
 import {
 	BOARD_OFFSET,
 	DEFAULT_BOARD,
@@ -7,14 +14,13 @@ import {
 	NUM_RANKS,
 	HORIZONTAL_AXIS,
 	ANIMATION_SPEED,
-	SETTINGS_MENU_OPTIONS,
 	ACTION_MENU_OPTIONS,
+	SETTINGS_MENU_OPTIONS,
 } from "./constants";
 import {
 	createStaticChessGrid,
 	renderBoardPieces,
 	getHoveredSquare,
-	deepCopyBoard,
 	renderPieceAt,
 	renderDataScreen,
 	renderMenuScreen,
@@ -22,23 +28,21 @@ import {
 import * as presets from "./presets";
 import { useGameBoyStore } from "@/app/store/gameboy";
 import { rows, columns } from "@/app/constants";
-import { Color } from "./logic/models";
-import {
-	wouldMoveResultInCheck,
-	isCheckmate,
-	isStalemate,
-	isInCheck,
-	isValidMove,
-	determineSpecialMove,
-	applyMoveToBoard,
-	reverseMoveOnBoard,
-} from "./logic";
-import { Pawn, Queen } from "./logic/pieces";
 import Cell from "@/app/Cell";
 import { delay, continuouslyAnimate } from "@/app/util/helper";
 import { useStockfish } from "./logic/useStockfish";
-import { parseStockfishMove, historyToUCI } from "./logic/FENConverter";
-import { useClickSequenceDetection } from "@/app/util/useClickSequenceDetection";
+import { historyToUCI } from "./logic/FENConverter";
+import { gameReducer, createInitialState } from "./state/reducer";
+import {
+	Actions,
+	createButtonAction,
+	createMenuAction,
+	createCursorAction,
+	createPieceSelectAction,
+	createComputerMoveAction,
+	createStockfishAction,
+} from "./state/actions";
+import { GAME_PHASE } from "./state/states";
 
 const initialCursor = {
 	row: Math.floor(
@@ -55,18 +59,11 @@ export default function Chess() {
 	const setGameState = useGameBoyStore((state) => state.setGameState);
 	const setGrid = useGameBoyStore((state) => state.setGrid);
 	const setCursor = useGameBoyStore((state) => state.setCursor);
-	const initializing = useGameBoyStore((state) => state.initializing);
 
 	const staticGridRef = useRef(createStaticChessGrid());
 
-	const [hasTitled, setHasTitled] = useState(false);
-	const [board, setBoard] = useState(DEFAULT_BOARD);
-	const [selectedSquare, setSelectedSquare] = useState(null);
-	const [possibleMoves, setPossibleMoves] = useState([]);
-	const [currentPlayer, setCurrentPlayer] = useState(Color.White);
-	const [computerColor, setComputerColor] = useState(Color.Black);
-	const [moveHistory, setMoveHistory] = useState([]);
-	const [capturedPieces, setCapturedPieces] = useState([]);
+	const [state, dispatch] = useReducer(gameReducer, createInitialState());
+
 	const [moveHelp, setMoveHelp] = useState([]); // [best, hint] moves
 	const [gameSettings, setGameSettings] = useState({
 		// From actions menu
@@ -74,139 +71,36 @@ export default function Chess() {
 		// From settings menu
 		mateInMoves: 1,
 		level: 1,
-		deepThinking: true,
-		openingBook: true,
-		teachingMode: false,
-		coordinates: true,
-		chessClock: false,
-		touchingRule: false,
-		whiteVisible: true,
-		blackVisible: true,
-		whitePosition: "bottom",
+		deepThinking: "Off",
+		sound: "On",
 	});
-	const [menuOptions, setMenuOptions] = useState(null);
-	const [selectedOption, setSelectedOption] = useState(0);
-	const [menuPhase, setMenuPhase] = useState(0);
-	const [replayMode, setReplayMode] = useState(false);
 	const animatingPieceRef = useRef(null);
 	const animationRef = useRef({ running: false });
-	const dataScreenRef = useRef(false);
-	const redoMoveStackRef = useRef([]); // Stores undone moves
 
-	const {
-		isReady,
-		bestMove,
-		getBestMove,
-		newGame,
-		getHint,
-		forceMove,
-		offerDraw,
-	} = useStockfish(gameSettings.level);
-
-	const updateBoardCursor = useCallback(
-		(thinking) => {
-			if (!hasTitled || replayMode) return;
-			setCursor((prev) => ({
-				...prev,
-				cells: thinking ? presets.thinking : presets.cursor,
-			}));
-		},
-		[hasTitled, replayMode]
+	const isGameReady = useMemo(
+		() =>
+			state.phase !== GAME_PHASE.INITIALIZING &&
+			state.phase !== GAME_PHASE.WELCOMING,
+		[state.phase]
 	);
+
+	const { isReady, getBestMove, newGame, getHint, offerDraw, forceMove } =
+		useStockfish(1);
 
 	// Compute grid based on board and state
 	const boardGrid = useMemo(() => {
 		const next = staticGridRef.current.map((row) => [...row]);
-		renderBoardPieces(board, next, selectedSquare, possibleMoves);
+		renderBoardPieces(
+			state.board,
+			next,
+			state.selectedSquare,
+			state.possibleMoves
+		);
 		return next;
-	}, [board, selectedSquare, possibleMoves]);
-
-	const getLastMove = useCallback(() => {
-		return moveHistory?.length > 0
-			? moveHistory[moveHistory.length - 1]
-			: null;
-	}, [moveHistory]);
-
-	const getPossibleMoves = useCallback(
-		(square) => {
-			const { row, col } = square;
-			const piece = board[row][col];
-			if (!piece || piece.color !== currentPlayer) return [];
-			const gameState = { lastMove: getLastMove() };
-			const from = { row, col };
-			const candidateMoves = piece.getPossibleMoves(
-				from,
-				board,
-				gameState
-			);
-			// Filter out moves that would result in check
-			return candidateMoves.filter(
-				(to) => !wouldMoveResultInCheck(from, to, board, piece.color)
-			);
-		},
-		[board, currentPlayer, getLastMove]
-	);
-
-	const menuActions = useMemo(
-		() => ({
-			changeSides: () => {
-				setMenuPhase(0);
-				setCursor((prev) => ({ ...prev, display: true }));
-
-				setTimeout(() => {
-					setComputerColor((prev) =>
-						prev === Color.White ? Color.Black : Color.White
-					);
-				}, 0);
-			},
-			forceMove: () => {
-				setMenuPhase(0);
-				setCursor((prev) => ({ ...prev, display: true }));
-				forceMove();
-			},
-			takebackReplay: () => {
-				setMenuPhase(0);
-				setReplayMode(true);
-				setCursor((prev) => ({ ...prev, display: true }));
-			},
-			setupBoard: () => {},
-			solveForMate: () => {},
-			offerDraw: () => {
-				setMenuPhase(0);
-				setCursor((prev) => ({ ...prev, display: true }));
-
-				const moves = historyToUCI(moveHistory);
-				offerDraw(moves, (shouldAccept, score) => {
-					if (shouldAccept) {
-						window.alert("DRAW ACCEPTED");
-					} else {
-						window.alert("DRAW REJECTED");
-					}
-				});
-			},
-			loadGame: () => {},
-			saveGame: () => {},
-			beginNewGame: () => {
-				setMenuPhase(0);
-				setBoard(DEFAULT_BOARD);
-				setSelectedSquare(null);
-				setPossibleMoves([]);
-				setCurrentPlayer(Color.White);
-				setComputerColor(Color.Black);
-				setMoveHistory([]);
-				setCapturedPieces([]);
-				setMoveHelp([]);
-				setCursor(() => ({ ...initialCursor, display: true }));
-
-				newGame(gameSettings.level);
-			},
-		}),
-		[newGame, gameSettings.level, forceMove, offerDraw, moveHistory]
-	);
+	}, [state.board, state.selectedSquare, state.possibleMoves]);
 
 	const loadGame = useCallback(async () => {
-		setHasTitled(false);
-		// setBoard(DEFAULT_BOARD);
+		dispatch({ type: Actions.INITIALIZATION_COMPLETE });
 		setGrid(() =>
 			presets.titleScreen.map((row) =>
 				row.map((c) => new Cell({ color: c }))
@@ -216,13 +110,9 @@ export default function Chess() {
 		newGame(0); // 0 = weakest, 20 = strongest
 		await delay(1000);
 		await delay(1500);
-		setHasTitled(true);
+		dispatch({ type: Actions.TITLE_SCREEN_COMPLETE });
 		setCursor((prev) => ({ ...prev, display: true }));
 	}, [setCursor, setGrid, newGame]);
-
-	const resetGame = useCallback(() => {}, []);
-
-	const runGame = useCallback(() => {}, []);
 
 	const handleGameCursor = useCallback(
 		({ context, cursor, drawCell, rows, columns }) => {
@@ -241,6 +131,7 @@ export default function Chess() {
 
 	const handleGameDpad = useCallback(
 		(r, c) => {
+			// Move visual cursor
 			setCursor((prev) => {
 				// restrict movement to within screen grid (prevent out of bounds)
 				const nRow = Math.max(
@@ -259,45 +150,256 @@ export default function Chess() {
 				};
 			});
 
-			// If in menu screen, change selected setting and update screen
-			if (menuPhase === 1 || menuPhase === 2) {
-				setSelectedOption(
-					(selectedOption + r + menuOptions.length) %
-						menuOptions.length
-				);
-			}
+			dispatch(createCursorAction({ r, c }));
 		},
-		[setCursor, menuOptions, selectedOption, menuPhase]
+		[setCursor]
 	);
 
-	// Build grid with current animation state
-	const buildAnimatedGrid = useCallback(() => {
-		const next = staticGridRef.current.map((row) => [...row]);
-		const animating = animatingPieceRef.current;
+	const handleMenuGameAction = useCallback(
+		(e) => {
+			// Handle menu option selection (both ACTIONS and SETTINGS)
+			if (
+				state.phase !== GAME_PHASE.MENU_ACTIONS &&
+				state.phase !== GAME_PHASE.MENU_SETTINGS
+			)
+				return;
 
-		renderBoardPieces(
-			board,
-			next,
-			selectedSquare,
-			possibleMoves,
-			animating
-		);
+			const menuOptions =
+				state.phase === GAME_PHASE.MENU_ACTIONS
+					? ACTION_MENU_OPTIONS
+					: SETTINGS_MENU_OPTIONS;
 
-		if (animating) {
-			const pieceArr = presets.getPiece(animating.piece.FENChar);
-			if (pieceArr) {
-				renderPieceAt(next, pieceArr, {
-					row: Math.round(animating.currentPos.row),
-					col: Math.round(animating.currentPos.col),
+			const option = menuOptions[state.selectedOption];
+			if (!option || option?.disabled) return;
+
+			// If option has values, it's a setting - cycle the value
+			if (option.hasOwnProperty("values") && option.values) {
+				setGameSettings((prev) => {
+					const currentIndex = option.values.indexOf(
+						prev[option.key]
+					);
+					const nextIndex = (currentIndex + 1) % option.values.length;
+					return {
+						...prev,
+						[option.key]: option.values[nextIndex],
+					};
 				});
+				return;
 			}
+
+			// Otherwise, it's an action - dispatch to state machine
+			dispatch(createMenuAction(option.key));
+		},
+		[state.phase, state.selectedOption]
+	);
+
+	const handleGameAction = useCallback(
+		(e) => {
+			const buttonId = e.currentTarget.id;
+
+			// A button
+			if (buttonId === "a") {
+				// Handle menu option selection (both ACTIONS and SETTINGS)
+				if (
+					state.phase === GAME_PHASE.MENU_ACTIONS ||
+					state.phase === GAME_PHASE.MENU_SETTINGS
+				) {
+					return handleMenuGameAction(e);
+				}
+
+				// Handle board actions
+				const hoveredSquare = getHoveredSquare(state.board);
+				if (!hoveredSquare) return;
+
+				dispatch(createPieceSelectAction(hoveredSquare));
+			}
+
+			// B button
+			if (buttonId === "b") {
+				dispatch(createButtonAction(Actions.B_BUTTON));
+			}
+		},
+		[state.board, state.phase, handleMenuGameAction]
+	);
+
+	const handleGameSelect = useCallback(() => {
+		dispatch(createButtonAction(Actions.SELECT_BUTTON));
+	}, []);
+
+	const handleGameStart = useCallback(() => {
+		dispatch(createButtonAction(Actions.START_BUTTON));
+	}, []);
+
+	useEffect(() => {
+		// Set cursor to initial state, will update display status when game is loaded
+		setCursor(() => ({ ...initialCursor }));
+	}, []);
+
+	// Request and execute computer move in one place
+	useEffect(() => {
+		if (
+			!isGameReady ||
+			!isReady ||
+			state.phase !== GAME_PHASE.WAITING_FOR_PLAYER ||
+			state.currentPlayer !== state.computerColor
+		)
+			return;
+
+		const moves = historyToUCI(state.moveHistory);
+
+		getBestMove(moves, (move) => {
+			if (move !== "none" && move !== "(none)") {
+				// get hint with new move
+				getHint(moves + " " + move, (info) => setMoveHelp(info));
+			}
+
+			dispatch(createComputerMoveAction(move));
+		});
+	}, [
+		isGameReady,
+		state.phase,
+		state.currentPlayer,
+		state.computerColor,
+		state.moveHistory,
+		isReady,
+		getBestMove,
+		getHint,
+	]);
+
+	// Force computer move
+	useEffect(() => {
+		if (
+			!isGameReady ||
+			state.phase !== GAME_PHASE.WAITING_FOR_STOCKFISH ||
+			state.stockfishOperation?.type !== "force_move" ||
+			!isReady
+		)
+			return;
+
+		forceMove();
+
+		// No need to dispatch action here - it's handled by the initial request computer move callback
+	}, [
+		isGameReady,
+		state.phase,
+		state.stockfishOperation,
+		isReady,
+		forceMove,
+	]);
+
+	// Offer draw evaluation
+	useEffect(() => {
+		if (
+			!isGameReady ||
+			state.phase !== GAME_PHASE.WAITING_FOR_STOCKFISH ||
+			state.stockfishOperation?.type !== "offer_draw" ||
+			!isReady
+		)
+			return;
+
+		const moves = historyToUCI(state.moveHistory);
+
+		offerDraw(moves, (shouldAccept, _) => {
+			dispatch(
+				createStockfishAction(
+					shouldAccept ? Actions.DRAW_ACCEPTED : Actions.DRAW_REJECTED
+				)
+			);
+		});
+	}, [
+		isGameReady,
+		state.phase,
+		state.stockfishOperation,
+		state.moveHistory,
+		isReady,
+		offerDraw,
+	]);
+
+	useEffect(() => {
+		if (!isGameReady) return;
+
+		switch (state.phase) {
+			case GAME_PHASE.DATA_SCREEN:
+				setGrid(renderDataScreen(state.moveHistory, moveHelp));
+				break;
+			case GAME_PHASE.MENU_ACTIONS:
+				setGrid(
+					renderMenuScreen(
+						1,
+						ACTION_MENU_OPTIONS,
+						gameSettings,
+						state.selectedOption
+					)
+				);
+				break;
+			case GAME_PHASE.MENU_SETTINGS:
+				setGrid(
+					renderMenuScreen(
+						2,
+						SETTINGS_MENU_OPTIONS,
+						gameSettings,
+						state.selectedOption
+					)
+				);
+				break;
+			default:
+				setGrid(boardGrid);
+		}
+	}, [
+		isGameReady,
+		state.phase,
+		state.moveHistory,
+		state.selectedOption,
+		moveHelp,
+		boardGrid,
+		setGrid,
+		gameSettings,
+	]);
+
+	// Animate piece selection when transitioning to ANIMATING
+	useEffect(() => {
+		if (state.phase !== GAME_PHASE.ANIMATING || !state.animatingMove)
+			return;
+
+		const { from, to, isReverse } = state.animatingMove;
+		const finalFrom = isReverse ? to : from;
+		const finalTo = isReverse ? from : to;
+		const piece = state.board[finalFrom.row][finalFrom.col];
+
+		if (!piece) {
+			dispatch({ type: Actions.ANIMATION_COMPLETE });
+			return;
 		}
 
-		return next;
-	}, [board, selectedSquare, possibleMoves]);
+		// Don't animate player turns unless in replay mode
+		if (
+			state.previousPhase !== GAME_PHASE.REPLAY &&
+			state.currentPlayer !== state.computerColor
+		) {
+			dispatch({ type: Actions.ANIMATION_COMPLETE });
+			return;
+		}
 
-	const animatePieceMove = useCallback(
-		(piece, from, to, onComplete) => {
+		const buildAnimatedGrid = () => {
+			const next = staticGridRef.current.map((row) => [...row]);
+			const animating = animatingPieceRef.current;
+
+			renderBoardPieces(state.board, next, null, null, animating);
+
+			if (animating) {
+				const pieceArr = presets.getPiece(animating.piece.FENChar);
+				if (pieceArr) {
+					renderPieceAt(next, pieceArr, {
+						row: Math.round(animating.currentPos.row),
+						col: Math.round(animating.currentPos.col),
+					});
+				}
+			}
+
+			return next;
+		};
+
+		const animatePieceMove = (piece, from, to, onComplete) => {
 			if (from.row === to.row && from.col === to.col) {
 				// No movement needed
 				onComplete();
@@ -363,564 +465,102 @@ export default function Chess() {
 			);
 
 			animate();
-		},
-		[setGrid, buildAnimatedGrid]
-	);
+		};
 
-	const applyBoardUpdate = useCallback(
-		(newBoard, nextPlayer, lastMove, isUndoLastMove = false) => {
-			setMoveHistory((prev) => {
-				if (isUndoLastMove) {
-					return prev.slice(0, -1);
-				}
-				return [...prev, lastMove];
-			});
-			setBoard(newBoard);
-			setCurrentPlayer(nextPlayer);
-			setSelectedSquare(null);
-			setPossibleMoves([]);
-			updateBoardCursor(false);
-			// Handle captured pieces based on whether we're undoing or making a move
-			if (lastMove.captured) {
-				if (isUndoLastMove) {
-					// When undoing, remove the captured piece from the array
-					setCapturedPieces((prev) => {
-						// Find and remove the last occurrence of the captured piece
-						const index = prev.findLastIndex(
-							(p) => p === lastMove.captured
-						);
-						if (index !== -1) {
-							return [
-								...prev.slice(0, index),
-								...prev.slice(index + 1),
-							];
-						}
-						return prev;
-					});
-				} else {
-					// When making a move or redoing, add the captured piece
-					setCapturedPieces((prev) => [...prev, lastMove.captured]);
-				}
-			}
-
-			if (isUndoLastMove) {
-				redoMoveStackRef.current.push(lastMove);
-			}
-
-			// Suppress game status checks when in replay mode
-			if (!replayMode) {
-				// Check game status
-				if (isCheckmate(nextPlayer, newBoard)) {
-					window.alert(
-						`${
-							nextPlayer === Color.White ? "Black" : "White"
-						} wins!`
-					);
-				} else if (isStalemate(nextPlayer, newBoard)) {
-					window.alert("Draw by stalemate");
-				} else if (isInCheck(nextPlayer, newBoard)) {
-					window.alert(
-						`${
-							nextPlayer === Color.White ? "White" : "Black"
-						} is in check`
-					);
-				}
-			}
-		},
-		[updateBoardCursor, replayMode]
-	);
-
-	const makeMove = useCallback(
-		(from, to) => {
-			console.log("makeMove", { from, to });
-			const newBoard = deepCopyBoard(board);
-			const piece = newBoard[from.row][from.col];
-			const capturedPiece = newBoard[to.row][to.col];
-			const originalHasMoved =
-				piece.hasMoved !== undefined ? piece.hasMoved : null;
-
-			const specialMove = determineSpecialMove(
-				piece,
-				from,
-				to,
-				capturedPiece
-			);
-
-			// Store original rook hasMoved state for castling
-			let originalRookHasMoved = null;
-			if (specialMove === "castle") {
-				const direction = to.col > from.col ? 1 : -1;
-				const rookCol = direction === 1 ? 7 : 0;
-				const rook = newBoard[from.row][rookCol];
-				originalRookHasMoved =
-					rook?.hasMoved !== undefined ? rook.hasMoved : null;
-			}
-
-			// Handle promotion - create the promoted piece
-			// Todo: add piece selection (queen, rook, bishop, or knight)
-			const PromotionClass = Queen;
-			let promotionPiece = null;
-			let promotionFENChar = "";
-			if (specialMove === "promotion") {
-				promotionPiece = new PromotionClass(piece.color);
-				promotionFENChar = promotionPiece.FENChar;
-			}
-
-			// Apply the move using consolidated logic
-			applyMoveToBoard(newBoard, {
-				from,
-				to,
-				piece,
-				special: specialMove,
-				promotionPiece,
-			});
-
-			const nextPlayer =
-				currentPlayer === Color.White ? Color.Black : Color.White;
-
-			const moveEntry = {
-				from,
-				to,
-				piece,
-				captured: capturedPiece,
-				notation: `${from.file}${from.rank}${to.file}${to.rank}${promotionFENChar}`,
-				display: `${from.file}${from.rank}-${to.file}${to.rank}`,
-				special: specialMove,
-				originalHasMoved,
-				originalRookHasMoved,
-			};
-
-			// Only animate the computer's turn
-			if (currentPlayer === computerColor) {
-				// Animate, then apply board update
-				animatePieceMove(piece, from, to, () =>
-					applyBoardUpdate(newBoard, nextPlayer, moveEntry)
-				);
-			} else {
-				applyBoardUpdate(newBoard, nextPlayer, moveEntry);
-			}
-		},
-		[
-			board,
-			currentPlayer,
-			animatePieceMove,
-			computerColor,
-			applyBoardUpdate,
-		]
-	);
-
-	const undoLastMove = useCallback(() => {
-		if (moveHistory.length === 0) {
-			window.alert("NO MORE MOVES TO TAKE BACK");
-			return;
-		}
-
-		const lastMoveEntry = moveHistory[moveHistory.length - 1];
-		const newBoard = deepCopyBoard(board);
-
-		// Reverse the move using consolidated logic
-		reverseMoveOnBoard(newBoard, lastMoveEntry);
-
-		animatePieceMove(
-			lastMoveEntry.piece,
-			lastMoveEntry.to,
-			lastMoveEntry.from,
-			() =>
-				applyBoardUpdate(
-					newBoard,
-					lastMoveEntry.piece.color,
-					lastMoveEntry,
-					true
-				)
-		);
-	}, [moveHistory, board, applyBoardUpdate, animatePieceMove]);
-
-	const redoLastMove = useCallback(() => {
-		if (redoMoveStackRef.current.length === 0) {
-			window.alert("NO MORE MOVES TO REPLAY");
-			return;
-		}
-
-		const moveToRedo = redoMoveStackRef.current.pop();
-		const newBoard = deepCopyBoard(board);
-
-		// Handle promotion - re-specify the piece selection (defaults to Queen for now)
-		if (moveToRedo.special === "promotion") {
-			const PromotionClass = Queen;
-			moveToRedo.promotionPiece = new PromotionClass(
-				moveToRedo.piece.color
-			);
-		}
-
-		// Apply the move forward using consolidated logic
-		applyMoveToBoard(newBoard, moveToRedo);
-
-		const nextPlayer =
-			moveToRedo.piece.color === Color.White ? Color.Black : Color.White;
-
-		animatePieceMove(moveToRedo.piece, moveToRedo.from, moveToRedo.to, () =>
-			applyBoardUpdate(newBoard, nextPlayer, moveToRedo)
-		);
-	}, [board, applyBoardUpdate, animatePieceMove]);
-
-	const handleMenuAction = useCallback(
-		(e) => {
-			if (
-				(menuPhase !== 1 && menuPhase !== 2) ||
-				e.currentTarget.id !== "a"
-			)
-				return;
-
-			const option = menuOptions[selectedOption];
-			if (!option || option?.disabled) return;
-
-			// Value-cycling option
-			if (option.hasOwnProperty("values") && option.values) {
-				setGameSettings((prev) => {
-					const currentIndex = option.values.indexOf(
-						prev[option.key]
-					);
-					const nextIndex = (currentIndex + 1) % option.values.length;
-					return { ...prev, [option.key]: option.values[nextIndex] };
-				});
-			}
-			// Action option
-			else if (menuActions[option.key]) {
-				menuActions[option.key]();
-			}
-		},
-		[menuOptions, selectedOption, menuActions, menuPhase]
-	);
-
-	const handleReplayGameAction = useCallback(
-		(e) => {
-			// Intentional alternate way to open replay mode (main is through action menu)
-			if (
-				!menuPhase &&
-				!selectedSquare &&
-				e.currentTarget.id === "b" &&
-				!dataScreenRef.current &&
-				!replayMode
-			) {
-				setReplayMode(true);
-				return true;
-			}
-
-			if (
-				replayMode &&
-				e.currentTarget.id === "b" &&
-				!animatingPieceRef.current
-			) {
-				undoLastMove();
-				return true;
-			}
-			if (
-				replayMode &&
-				e.currentTarget.id === "a" &&
-				!animatingPieceRef.current
-			) {
-				redoLastMove();
-				return true;
-			}
-
-			return false;
-		},
-		[replayMode, menuPhase, selectedSquare, undoLastMove, redoLastMove]
-	);
-
-	const handleGameAction = useCallback(
-		(e) => {
-			if (menuPhase !== 0) {
-				handleMenuAction(e);
-				return;
-			}
-
-			const exit = handleReplayGameAction(e);
-			if (exit) return;
-
-			// Prevent interaction during computer's turn
-			if (currentPlayer === computerColor || replayMode) return;
-
-			if (e.currentTarget.id === "a") {
-				// find square closest to cursor
-				const hoveredSquare = getHoveredSquare(board);
-				if (!hoveredSquare) return;
-				if (selectedSquare) {
-					// MAKING A MOVE / PLACING PIECE
-					const from = selectedSquare;
-					const to = hoveredSquare;
-					const piece = board[from.row][from.col];
-					const gameState = { lastMove: getLastMove() };
-
-					if (
-						piece &&
-						isValidMove(piece, from, to, board, gameState) &&
-						piece.color === currentPlayer
-					) {
-						makeMove(from, to);
-					} else {
-						// Select new piece if clicking on own piece
-						const piece = hoveredSquare.piece;
-						if (piece && piece.color === currentPlayer) {
-							setSelectedSquare(hoveredSquare);
-							setPossibleMoves(getPossibleMoves(hoveredSquare));
-							setCursor((prev) => ({
-								...prev,
-								cells: presets.getPiece(piece.FENChar),
-							}));
-						} else {
-							setSelectedSquare(null);
-							setPossibleMoves([]);
-							setCursor((prev) => ({
-								...prev,
-								cells: presets.cursor,
-							}));
-						}
-					}
-				} else {
-					// SELECT / PICKUP PIECE
-					const piece = hoveredSquare.piece;
-					if (piece && piece.color !== computerColor) {
-						setSelectedSquare(hoveredSquare);
-						setPossibleMoves(getPossibleMoves(hoveredSquare));
-						setCursor((prev) => ({
-							...prev,
-							cells: presets.getPiece(piece.FENChar),
-						}));
-					}
-				}
-			}
-
-			if (e.currentTarget.id === "b") {
-				// CANCEL - Just reset visual state
-				if (!selectedSquare) return;
-				setSelectedSquare(null);
-				setPossibleMoves([]);
-				setCursor((prev) => ({ ...prev, cells: presets.cursor }));
-			}
-		},
-		[
-			board,
-			makeMove,
-			selectedSquare,
-			setCursor,
-			getPossibleMoves,
-			currentPlayer,
-			computerColor,
-			getLastMove,
-			computerColor,
-			menuPhase,
-			handleMenuAction,
-			replayMode,
-			handleReplayGameAction,
-		]
-	);
-
-	const handleGameSelect = useCallback(() => {
-		// Don't run if animation is ongoing or data screen is open
-		if (animationRef.current.running || dataScreenRef.current) return;
-
-		if (menuPhase === 0 && !replayMode) {
-			// Render action menu
-			setMenuOptions(ACTION_MENU_OPTIONS);
-			setMenuPhase(1);
-			setCursor((prev) => ({ ...prev, display: false }));
-		} else if (menuPhase === 1 && !replayMode) {
-			// Render settings menu
-			setMenuOptions(SETTINGS_MENU_OPTIONS);
-			setMenuPhase(2);
-			setCursor((prev) => ({ ...prev, display: false }));
-		} else if (menuPhase === 2 && !replayMode) {
-			// Close menu
-			setMenuOptions(null);
-			setMenuPhase(0);
-			setCursor((prev) => ({ ...prev, display: true }));
-			setBoard(board.map((row) => [...row]));
-		}
-
-		setSelectedOption(0);
-
-		if (replayMode) {
-			setReplayMode(false);
-			redoMoveStackRef.current = [];
-		}
-	}, [board, menuActions, menuPhase, replayMode]);
-
-	const handleGameStart = useCallback(() => {}, []);
-
-	const handleGameCellClick = useCallback(() => {}, []);
-
-	const handleGameEEShortcuts = useMemo(
-		() => [
-			[
-				["start"],
-				() => {
-					// Don't run if animation is ongoing
-					if (animationRef.current.running) return;
-
-					// Show Data Screen, cursor is hidden
-					if (!dataScreenRef.current) {
-						setCursor((prev) => ({ ...prev, display: false }));
-						const parsedMoveHelp =
-							moveHelp.length == 2
-								? [
-										parseStockfishMove(moveHelp[0]).display,
-										parseStockfishMove(moveHelp[1]).display,
-								  ]
-								: [];
-						setGrid(
-							renderDataScreen(
-								moveHistory,
-								parsedMoveHelp,
-								capturedPieces
-							)
-						);
-					}
-
-					// Go back to board view, cursor is visible
-					if (dataScreenRef.current) {
-						setBoard(board.map((row) => [...row]));
-						setCursor((prev) => ({ ...prev, display: true }));
-					}
-
-					dataScreenRef.current = !dataScreenRef.current;
-				},
-			],
-		],
-		[board, moveHistory, currentPlayer, moveHelp, capturedPieces]
-	);
-
-	useClickSequenceDetection(handleGameEEShortcuts);
-
-	// Request and execute computer move in one place
-	useEffect(() => {
-		if (
-			!hasTitled ||
-			currentPlayer !== computerColor ||
-			!isReady ||
-			replayMode
-		)
-			return;
-
-		updateBoardCursor(true);
-
-		const moves = historyToUCI(moveHistory);
-
-		getBestMove(moves, (move) => {
-			// Handle no legal moves
-			if (bestMove === "(none)" || bestMove === "none") {
-				console.warn(
-					"Stockfish returned no move - checking game state"
-				);
-
-				// Determine if it's checkmate or stalemate
-				if (isCheckmate(computerColor, board)) {
-					const winner =
-						computerColor === Color.White ? "Black" : "White";
-					window.alert(`${winner} wins by checkmate!`);
-				} else if (isStalemate(computerColor, board)) {
-					window.alert("Draw by stalemate");
-				} else {
-					// This shouldn't happen - likely invalid position
-					console.error(
-						"Invalid game state - no moves but not checkmate/stalemate"
-					);
-				}
-
-				setCurrentPlayer(
-					currentPlayer === Color.White ? Color.Black : Color.White
-				);
-				updateBoardCursor(false);
-				return;
-			}
-
-			const parsedMove = parseStockfishMove(move);
-			if (!parsedMove) return;
-
-			const { from, to, promotion, notation } = parsedMove;
-			const piece = board[from.row][from.col];
-			if (!piece) return;
-
-			// get hint with new move
-			getHint(moves + " " + notation, (info) => setMoveHelp(info));
-
-			makeMove(from, to);
+		// Start animation - when complete, dispatch ANIMATION_COMPLETE
+		animatePieceMove(piece, finalFrom, finalTo, () => {
+			dispatch({ type: Actions.ANIMATION_COMPLETE });
 		});
 	}, [
-		hasTitled,
-		currentPlayer,
-		computerColor,
-		isReady,
-		moveHistory,
-		updateBoardCursor,
-		getBestMove,
-		makeMove,
-		replayMode,
+		state.phase,
+		state.previousPhase,
+		state.animatingMove,
+		state.board,
+		state.currentPlayer,
+		state.computerColor,
+		setGrid,
 	]);
 
+	// Unified cursor management: display and cells
 	useEffect(() => {
-		// Set cursor to initial state, will update display status when game is loaded
-		setCursor(() => ({ ...initialCursor }));
-	}, []);
+		if (!isGameReady) return;
 
-	// Takeback/Replay - update cursor cells based on replay mode
-	useEffect(() => {
-		if (initializing || !hasTitled) return;
-		setCursor((prev) => ({
-			...prev,
-			display: true,
-			cells: replayMode ? presets.takebackReplay : presets.cursor,
-		}));
-	}, [initializing, hasTitled, replayMode]);
+		let display = true;
+		let cells = presets.cursor;
 
-	useEffect(() => {
-		if (initializing || !hasTitled || menuPhase !== 0) return; // don't run if console is initializing or game hasn't loaded yet || menu is open
-		setGrid(boardGrid);
-	}, [initializing, hasTitled, setGrid, boardGrid, menuPhase]);
+		switch (state.phase) {
+			case GAME_PHASE.WAITING_FOR_PLAYER:
+				if (state.computerColor === state.currentPlayer) {
+					cells = presets.thinking;
+				}
+				break;
+			case GAME_PHASE.WAITING_FOR_STOCKFISH:
+				cells = presets.thinking;
+				break;
+			case GAME_PHASE.DATA_SCREEN:
+				display = false;
+				break;
+			case GAME_PHASE.MENU_ACTIONS:
+				display = false;
+				break;
+			case GAME_PHASE.MENU_SETTINGS:
+				display = false;
+				break;
+			case GAME_PHASE.REPLAY:
+				cells = presets.takebackReplay;
+				break;
+			case GAME_PHASE.ANIMATING:
+				if (state.previousPhase === GAME_PHASE.REPLAY) {
+					cells = presets.takebackReplay;
+				}
+				break;
+			case GAME_PHASE.PIECE_SELECTED:
+				display = true;
+				if (state.selectedSquare) {
+					const piece =
+						state.board[state.selectedSquare.row][
+							state.selectedSquare.col
+						];
+					const pieceArr = presets.getPiece(piece?.FENChar);
+					cells = pieceArr || presets.cursor;
+				}
+				break;
+			default:
+				display = true;
+				break;
+		}
 
-	useEffect(() => {
-		if (initializing || !hasTitled || (menuPhase !== 1 && menuPhase !== 2))
-			return;
-
-		const menuGrid = renderMenuScreen(
-			menuPhase,
-			menuOptions,
-			gameSettings,
-			selectedOption
-		);
-		setGrid(menuGrid);
+		setCursor((prev) => ({ ...prev, display, cells }));
 	}, [
-		initializing,
-		hasTitled,
-		menuPhase,
-		menuOptions,
-		gameSettings,
-		selectedOption,
+		isGameReady,
+		state.phase,
+		state.previousPhase,
+		state.selectedSquare,
+		state.board,
+		state.currentPlayer,
+		state.computerColor,
+		setCursor,
 	]);
 
 	useEffect(() => {
 		setGameState({
 			name: "chess",
 			loadGame,
-			resetGame,
-			runGame,
+			resetGame: () => {},
 			handleGameCursor,
 			handleGameDpad,
 			handleGameAction,
 			handleGameSelect,
 			handleGameStart,
-			handleGameCellClick,
+			handleGameCellClick: () => {},
 		});
 	}, [
 		setGameState,
 		loadGame,
-		resetGame,
-		runGame,
 		handleGameCursor,
 		handleGameDpad,
 		handleGameAction,
 		handleGameSelect,
 		handleGameStart,
-		handleGameCellClick,
 	]);
 }
