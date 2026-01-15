@@ -24,6 +24,7 @@ import {
 	renderPieceAt,
 	renderDataScreen,
 	renderMenuScreen,
+	renderAlertScreen,
 } from "./util";
 import * as presets from "./presets";
 import { useGameBoyStore } from "@/app/store/gameboy";
@@ -67,7 +68,7 @@ export default function Chess() {
 	const [moveHelp, setMoveHelp] = useState([]); // [best, hint] moves
 	const [gameSettings, setGameSettings] = useState({
 		// From actions menu
-		humanPlayers: 1,
+		humanPlayers: 2,
 		// From settings menu
 		mateInMoves: 1,
 		level: 1,
@@ -209,7 +210,6 @@ export default function Chess() {
 
 				// Handle board actions
 				const hoveredSquare = getHoveredSquare(state.board);
-				if (!hoveredSquare) return;
 
 				dispatch(createPieceSelectAction(hoveredSquare));
 			}
@@ -342,6 +342,9 @@ export default function Chess() {
 					)
 				);
 				break;
+			case GAME_PHASE.ALERT:
+				setGrid(renderAlertScreen(state.alert, state.board));
+				break;
 			default:
 				setGrid(boardGrid);
 		}
@@ -350,6 +353,8 @@ export default function Chess() {
 		state.phase,
 		state.moveHistory,
 		state.selectedOption,
+		state.board,
+		state.alert,
 		moveHelp,
 		boardGrid,
 		setGrid,
@@ -524,6 +529,9 @@ export default function Chess() {
 					const pieceArr = presets.getPiece(piece?.FENChar);
 					cells = pieceArr || presets.cursor;
 				}
+				break;
+			case GAME_PHASE.ALERT:
+				display = false;
 				break;
 			default:
 				display = true;

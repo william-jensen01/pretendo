@@ -2,6 +2,7 @@ import {
 	DEFAULT_BOARD,
 	ACTION_MENU_OPTIONS,
 	SETTINGS_MENU_OPTIONS,
+	ALERT,
 } from "../constants";
 import { Color } from "../logic/models";
 import { Actions } from "./actions";
@@ -11,8 +12,8 @@ import {
 	getPieceAt,
 	calculatePossibleMoves,
 	applyMoveToBoard,
-	isGameOver,
 } from "../logic/gameUtils";
+import { isCheckmate, isStalemate } from "../logic";
 import { parseStockfishMove } from "../logic/FENConverter";
 
 // ============================================================================
@@ -238,16 +239,20 @@ export const handleWaitingForStockfishPhase = (state, action, payload) => {
 		case Actions.DRAW_ACCEPTED:
 			return {
 				...state,
-				phase: GAME_PHASE.GAME_OVER,
-				previousPhase: null,
+				// Have ALERT redirect to GAME_OVER
+				phase: GAME_PHASE.ALERT,
+				alert: ALERT.MESSAGE.DRAW_ACCEPTED,
+				previousPhase: GAME_PHASE.GAME_OVER,
 				stockfishOperation: null,
 			};
 
 		case Actions.DRAW_REJECTED:
 			return {
 				...state,
-				phase: GAME_PHASE.WAITING_FOR_PLAYER,
-				previousPhase: null,
+				// Have ALERT redirect to WAITING_FOR_PLAYER
+				phase: GAME_PHASE.ALERT,
+				alert: ALERT.MESSAGE.DRAW_REJECTED,
+				previousPhase: GAME_PHASE.WAITING_FOR_PLAYER,
 				stockfishOperation: null,
 			};
 
@@ -261,6 +266,22 @@ export const handleWaitingForStockfishPhase = (state, action, payload) => {
 				stockfishOperation: null,
 			};
 		default:
+			return state;
+	}
+};
+
+export const handleAlertPhase = (state, action, _) => {
+	switch (action) {
+		case Actions.A_BUTTON:
+			// Dismiss alert and return to previous phase
+			return {
+				...state,
+				phase: state.previousPhase || GAME_PHASE.WAITING_FOR_PLAYER,
+				previousPhase: null,
+				alert: null,
+			};
+		default:
+			// Block all other inputs while alert is displayed
 			return state;
 	}
 };
@@ -299,6 +320,15 @@ export const handleSelectPiece = (state, cursorPosition) => {
 		gameState
 	);
 
+	if (possibleMoves.length === 0) {
+		return {
+			...state,
+			phase: GAME_PHASE.ALERT,
+			previousPhase: GAME_PHASE.WAITING_FOR_PLAYER,
+			alert: ALERT.MESSAGE.CAN_NOT_MOVE,
+		};
+	}
+
 	return {
 		...state,
 		phase: GAME_PHASE.PIECE_SELECTED,
@@ -308,16 +338,28 @@ export const handleSelectPiece = (state, cursorPosition) => {
 };
 
 export const handleMovePiece = (state, targetPosition) => {
+	// Check if clicking on the same square (deselect)
+	const isSameSquare =
+		state.selectedSquare.row === targetPosition.row &&
+		state.selectedSquare.col === targetPosition.col;
+
+	if (isSameSquare) {
+		// Clicking on selected piece deselects it
+		return handleCancelMove(state);
+	}
+
 	const isValidMove = state.possibleMoves.some(
 		(move) =>
 			move.row === targetPosition.row && move.col === targetPosition.col
 	);
 
 	if (!isValidMove) {
-		// Clicked on invalid square - deselect
+		// Clicked on invalid square - show illegal move alert
 		return {
 			...state,
-			phase: GAME_PHASE.WAITING_FOR_PLAYER,
+			phase: GAME_PHASE.ALERT,
+			previousPhase: GAME_PHASE.WAITING_FOR_PLAYER,
+			alert: ALERT.MESSAGE.ILLEGAL_MOVE,
 			selectedSquare: null,
 			possibleMoves: [],
 		};
@@ -348,11 +390,14 @@ export const handleComputerMove = (state, move) => {
 		console.warn("Stockfish returned no move - checking game state");
 
 		// Check for game over
-		if (isGameOver(state.board, state.currentPlayer)) {
+		const alertMessage = getGameOverAlert(state.board, state.currentPlayer);
+
+		if (alertMessage) {
 			return {
 				...state,
-				phase: GAME_PHASE.GAME_OVER,
-				previousPhase: null,
+				phase: GAME_PHASE.ALERT,
+				previousPhase: GAME_PHASE.GAME_OVER,
+				alert: alertMessage,
 				animatingMove: null,
 			};
 		} else {
@@ -381,7 +426,12 @@ export const handleRedoMove = (state) => {
 	// - Transition to ANIMATING (board update happens after animation)
 
 	if (!state.redoMoveStack || state.redoMoveStack.length === 0) {
-		return state;
+		return {
+			...state,
+			phase: GAME_PHASE.ALERT,
+			previousPhase: GAME_PHASE.WAITING_FOR_PLAYER,
+			alert: ALERT.MESSAGE.NO_MOVES_TO_REPLAY,
+		};
 	}
 
 	const moveToRedo = state.redoMoveStack[state.redoMoveStack.length - 1];
@@ -402,7 +452,12 @@ export const handleRedoMove = (state) => {
 
 export const handleUndoMove = (state) => {
 	if (!state.moveHistory || state.moveHistory.length === 0) {
-		return state;
+		return {
+			...state,
+			phase: GAME_PHASE.ALERT,
+			previousPhase: GAME_PHASE.WAITING_FOR_PLAYER,
+			alert: ALERT.MESSAGE.NO_MOVES_TO_UNDO,
+		};
 	}
 
 	const moveToUndo = state.moveHistory[state.moveHistory.length - 1];
@@ -482,6 +537,22 @@ export const openMenu = (state) => {
 	};
 };
 
+/**
+ * Determine game over type and return appropriate alert message
+ * Returns null if game is not over
+ */
+export const getGameOverAlert = (board, currentPlayer) => {
+	if (isCheckmate(currentPlayer, board)) {
+		// The player who just moved won (opposite of current player)
+		const winningColor =
+			currentPlayer === Color.White ? Color.Black : Color.White;
+		return ALERT.MESSAGE.CREATE_CHECKMATE(winningColor);
+	} else if (isStalemate(currentPlayer, board)) {
+		return ALERT.MESSAGE.STALEMATE;
+	}
+	return null;
+};
+
 // ============================================================================
 // ANIMATION HANDLERS
 // ============================================================================
@@ -512,12 +583,18 @@ export const onAnimationComplete = (state) => {
 		};
 	}
 
-	// Check for game over (ONLY when not in replay)
-	if (isGameOver(newState.board, newState.currentPlayer)) {
+	// Check for game over
+	const alertMessage = getGameOverAlert(
+		newState.board,
+		newState.currentPlayer
+	);
+
+	if (alertMessage) {
 		return {
 			...newState,
-			phase: GAME_PHASE.GAME_OVER,
-			previousPhase: null,
+			phase: GAME_PHASE.ALERT,
+			previousPhase: GAME_PHASE.GAME_OVER,
+			alert: alertMessage,
 			animatingMove: null,
 		};
 	}

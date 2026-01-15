@@ -12,13 +12,14 @@ import {
 	NUM_FILES,
 	DATA_SCREEN_CONFIG,
 	MENU_SCREEN_CONFIG,
+	ALERT,
 } from "./constants";
 import * as presets from "./presets";
 import { useGameBoyStore } from "@/app/store/gameboy";
 import { Color } from "./logic/models";
 import { Pawn } from "./logic/pieces";
 
-export const createStaticChessGrid = () => {
+export const createStaticChessGrid = (showCoords = true) => {
 	const grid = create2dArray();
 
 	// 1. BORDER
@@ -58,8 +59,10 @@ export const createStaticChessGrid = () => {
 		});
 	};
 
-	renderCoords(HORIZONTAL_AXIS, true);
-	renderCoords(VERTICAL_AXIS, false);
+	if (showCoords) {
+		renderCoords(HORIZONTAL_AXIS, true);
+		renderCoords(VERTICAL_AXIS, false);
+	}
 
 	// 3. BOARD SQUARE COLORS
 	for (let r = 0; r < 8; r++) {
@@ -543,6 +546,113 @@ export const renderMenuScreen = (
 				});
 			}
 		});
+
+	return grid;
+};
+
+export const renderAlertScreen = (alertText, board) => {
+	// Create a chess grid with no coordinates
+	const grid = createStaticChessGrid(false);
+	renderBoardPieces(board, grid, null, null, null, false);
+
+	// Constants
+	const {
+		LEFT_MARGIN: leftMargin,
+		RIGHT_MARGIN: rightMargin,
+		BORDER_THICKNESS: borderThickness,
+		TEXT_PADDING: textPadding,
+	} = ALERT.CONFIG.BOX;
+	const charWidth = 8;
+	const lineHeight = 8;
+	const ALERT_COLOR = ALERT.getColor(alertText);
+
+	// Calculate maximum available text area (within margins)
+	const maxTextAreaWidth =
+		columns -
+		leftMargin -
+		rightMargin -
+		borderThickness * 2 -
+		textPadding * 2;
+	const maxCharsPerLine = Math.floor(maxTextAreaWidth / charWidth);
+
+	// Capitalize and split text into lines
+	const words = alertText.toUpperCase().split(" ");
+	const lines = [];
+	let currentLine = "";
+
+	words.forEach((word) => {
+		const testLine = currentLine ? `${currentLine} ${word}` : word;
+		if (testLine.length <= maxCharsPerLine) {
+			currentLine = testLine;
+		} else {
+			if (currentLine) lines.push(currentLine);
+			currentLine = word;
+		}
+	});
+	if (currentLine) lines.push(currentLine);
+
+	// Calculate actual text dimensions
+	const longestLineLength = Math.max(...lines.map((line) => line.length));
+	const textWidth = longestLineLength * charWidth;
+	const textHeight = lines.length * lineHeight;
+
+	// Calculate box dimensions based on text
+	const boxWidth = textWidth + textPadding * 2 + borderThickness * 2;
+	const boxHeight = textHeight + textPadding * 2 + borderThickness * 2;
+
+	// Center the box, respecting margins, rounded to nearest 8-pixel square
+	// Favor left side having more gap when sides are asymmetric .... ceil()
+	const idealStartCol = Math.ceil((columns - boxWidth) / 2 / 8) * 8;
+	// Push the box down by one 8-pixel square
+	const idealStartRow = Math.floor((rows - boxHeight + 8) / 2 / 8) * 8;
+
+	// Ensure box stays within margins
+	const startCol = Math.max(leftMargin, idealStartCol);
+	const startRow = Math.max(0, idealStartRow);
+
+	// Draw border box
+	const boxEndRow = startRow + boxHeight;
+	const boxEndCol = startCol + boxWidth;
+
+	for (let r = startRow; r < boxEndRow; r++) {
+		for (let c = startCol; c < boxEndCol; c++) {
+			// Check if we're in the border area
+			const isTopBorder = r < startRow + borderThickness;
+			const isBottomBorder = r >= boxEndRow - borderThickness;
+			const isLeftBorder = c < startCol + borderThickness;
+			const isRightBorder = c >= boxEndCol - borderThickness;
+
+			if (
+				isTopBorder ||
+				isBottomBorder ||
+				isLeftBorder ||
+				isRightBorder
+			) {
+				grid[r][c] = new Cell({
+					color: ALERT_COLOR.BORDER,
+				});
+			} else {
+				// Interior of the box (background)
+				grid[r][c] = new Cell({
+					color: ALERT_COLOR.INTERIOR,
+				});
+			}
+		}
+	}
+
+	// Render text lines (centered horizontally within the box)
+	const textStartRow = startRow + borderThickness + textPadding;
+	const textStartCol = startCol + borderThickness + textPadding;
+
+	lines.forEach((line, idx) => {
+		const rowOffset = textStartRow + idx * lineHeight;
+		// Center each line horizontally within the box, rounded to nearest 8-pixel square
+		const lineWidth = line.length * charWidth;
+		const horizontalOffset =
+			Math.round((textWidth - lineWidth) / 2 / 8) * 8;
+		const centeredCol = textStartCol + horizontalOffset;
+		renderText(line, grid, rowOffset, centeredCol, ALERT_COLOR.TEXT);
+	});
 
 	return grid;
 };

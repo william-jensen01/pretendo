@@ -13,6 +13,7 @@ import {
 	handleGameOverPhase,
 	handleWaitingForStockfishPhase,
 	handleComputerMove,
+	handleAlertPhase,
 } from "./handlers";
 import { Actions } from "./actions";
 import { GAME_PHASE } from "./states";
@@ -49,6 +50,9 @@ export const initialState = {
 
 	// Stockfish
 	stockfishOperation: null,
+
+	// Alert message
+	alert: null,
 };
 
 // ============================================================================
@@ -121,6 +125,10 @@ function transition(state, action, payload = {}) {
 			nextState = handleWaitingForStockfishPhase(state, action, payload);
 			break;
 
+		case GAME_PHASE.ALERT:
+			nextState = handleAlertPhase(state, action, payload);
+			break;
+
 		default:
 			console.warn(`Unknown phase: ${state.phase}`);
 			return state;
@@ -141,6 +149,11 @@ function transition(state, action, payload = {}) {
 		nextState.currentPlayer === nextState.computerColor
 	) {
 		return handleComputerMove(nextState, nextState.pendingComputerMove);
+	}
+
+	// FAILSAFE: Ensure alert is handled by overriding phase to ALERT
+	if (nextState.alert && nextState.phase !== GAME_PHASE.ALERT) {
+		return { ...nextState, phase: GAME_PHASE.ALERT };
 	}
 
 	return nextState;

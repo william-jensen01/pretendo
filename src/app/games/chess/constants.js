@@ -229,3 +229,58 @@ export const SETTINGS_MENU_OPTIONS = [
 		disabled: true,
 	},
 ];
+
+export const ALERT = {
+	MESSAGE: {
+		ILLEGAL_MOVE: "THAT IS NOT A LEGAL MOVE",
+		DRAW_REJECTED: "DRAW DECLINED",
+		DRAW_ACCEPTED: "DRAW ACCEPTED",
+		CREATE_CHECKMATE: (color) =>
+			`${color === Color.White ? "WHITE" : "BLACK"} WINS BY CHECKMATE!`,
+		CAN_NOT_MOVE: "THAT PIECE CAN NOT MOVE",
+		NO_MOVES_TO_REPLAY: "NO MORE MOVES TO REPLAY",
+		NO_MOVES_TO_UNDO: "NO MORE MOVES TO TAKE BACK",
+		STALEMATE: "DRAW BY STALEMATE",
+	},
+	CONFIG: {
+		BOX: {
+			LEFT_MARGIN: 8,
+			RIGHT_MARGIN: 8,
+			BORDER_THICKNESS: 8,
+			TEXT_PADDING: 8,
+		},
+		COLOR: {
+			SOFT: {
+				BORDER: 1,
+				INTERIOR: 3,
+				TEXT: 1, // adjusted
+			},
+			HARSH: {
+				BORDER: 2,
+				INTERIOR: 3,
+				TEXT: 1, // adjusted
+			},
+		},
+	},
+	getColor: (message) => {
+		const softMessages = [
+			ALERT.MESSAGE.ILLEGAL_MOVE,
+			ALERT.MESSAGE.CAN_NOT_MOVE,
+			ALERT.MESSAGE.NO_MOVES_TO_REPLAY,
+			ALERT.MESSAGE.NO_MOVES_TO_UNDO,
+		];
+		if (softMessages.includes(message)) {
+			return ALERT.CONFIG.COLOR.SOFT;
+		}
+		return ALERT.CONFIG.COLOR.HARSH;
+	},
+};
+
+/**
+ * Draw Declined
+ * 	Border: 2
+ * 	Interior: 3
+ * 	Text: 1
+ *
+ * Draw Accepted
+ */

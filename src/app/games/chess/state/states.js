@@ -24,4 +24,6 @@ export const GAME_PHASE = {
 	REPLAY: "REPLAY",
 	DATA_SCREEN: "DATA_SCREEN",
 	GAME_OVER: "GAME_OVER",
+
+	ALERT: "ALERT",
 };
