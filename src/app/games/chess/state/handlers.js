@@ -89,7 +89,7 @@ export const handlePieceSelectedPhase = (state, action, payload) => {
 
 		case Actions.SELECT_BUTTON:
 			// Open menu (clears piece selection)
-			return openMenu(state);
+			return openMenu(state, GAME_PHASE.WAITING_FOR_PLAYER);
 
 		case Actions.DPAD:
 			// Move cursor
@@ -207,7 +207,7 @@ export const handleGameOverPhase = (state, action, _) => {
 	switch (action) {
 		case Actions.SELECT_BUTTON:
 			// Open menu
-			return openMenu(state);
+			return openMenu(state, GAME_PHASE.GAME_OVER);
 
 		case Actions.B_BUTTON:
 			// Enter replay mode
@@ -534,10 +534,11 @@ export const handleMenuAction = (state, action) => {
 	}
 };
 
-export const openMenu = (state) => {
+export const openMenu = (state, returnToPhase) => {
 	return {
 		...state,
 		phase: GAME_PHASE.MENU_ACTIONS,
+		previousPhase: returnToPhase,
 		selectedSquare: null,
 		possibleMoves: [],
 		selectedOption: 0,
