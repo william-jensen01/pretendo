@@ -44,6 +44,7 @@ import {
 	createStockfishAction,
 } from "./state/actions";
 import { GAME_PHASE } from "./state/states";
+import { useGameSound } from "./useGameSound";
 
 const initialCursor = {
 	row: Math.floor(
@@ -77,6 +78,8 @@ export default function Chess() {
 	});
 	const animatingPieceRef = useRef(null);
 	const animationRef = useRef({ running: false });
+	const prevSelectedOptionRef = useRef(state.selectedOption);
+	const delayStockfishRef = useRef(0);
 
 	const isGameReady = useMemo(
 		() =>
@@ -87,6 +90,8 @@ export default function Chess() {
 
 	const { isReady, getBestMove, newGame, getHint, offerDraw, forceMove } =
 		useStockfish(1);
+
+	const soundPlayingRef = useGameSound({state, delayStockfishRef, prevSelectedOptionRef})
 
 	// Compute grid based on board and state
 	const boardGrid = useMemo(() => {
@@ -151,6 +156,7 @@ export default function Chess() {
 				};
 			});
 
+			if (soundPlayingRef.current) return; // Block during sound
 			dispatch(createCursorAction({ r, c }));
 		},
 		[setCursor]
@@ -196,6 +202,8 @@ export default function Chess() {
 
 	const handleGameAction = useCallback(
 		(e) => {
+			if (soundPlayingRef.current) return; // Block during sound
+
 			const buttonId = e.currentTarget.id;
 
 			// A button
@@ -223,10 +231,14 @@ export default function Chess() {
 	);
 
 	const handleGameSelect = useCallback(() => {
+		if (soundPlayingRef.current) return; // Block during sound
+
 		dispatch(createButtonAction(Actions.SELECT_BUTTON));
 	}, []);
 
 	const handleGameStart = useCallback(() => {
+		if (soundPlayingRef.current) return; // Block during sound
+
 		dispatch(createButtonAction(Actions.START_BUTTON));
 	}, []);
 
@@ -247,17 +259,29 @@ export default function Chess() {
 
 		const moves = historyToUCI(state.moveHistory);
 
-		getBestMove(moves, (move) => {
-			if (move !== "none" && move !== "(none)") {
-				// get hint with new move
-				getHint(moves + " " + move, (info) => setMoveHelp(info));
-			}
+		// Delay is to ensure the move sound is finished before computer move
+		// Always delay unless coming from REPLAY
+		const needsDelay = state.previousPhase !== GAME_PHASE.REPLAY;
+		const delayMs = needsDelay ? delayStockfishRef.current : 0;
 
-			dispatch(createComputerMoveAction(move));
-		});
+		const timer = setTimeout(() => {
+			getBestMove(moves, (move) => {
+				if (move !== "none" && move !== "(none)") {
+					// get hint with new move
+					getHint(moves + " " + move, (info) => setMoveHelp(info));
+				}
+
+				dispatch(createComputerMoveAction(move));
+			});
+		}, delayMs);
+
+		return () => {
+			clearTimeout(timer);
+		};
 	}, [
 		isGameReady,
 		state.phase,
+		state.previousPhase,
 		state.currentPlayer,
 		state.computerColor,
 		state.moveHistory,

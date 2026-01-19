@@ -174,6 +174,7 @@ export const handleReplayPhase = (state, action, payload) => {
 			return {
 				...state,
 				phase: GAME_PHASE.WAITING_FOR_PLAYER,
+				previousPhase: GAME_PHASE.REPLAY,
 				// Clear redo stack when exiting replay
 				redoMoveStack: [],
 			};
@@ -370,6 +371,7 @@ export const handleMovePiece = (state, targetPosition) => {
 		from: state.selectedSquare,
 		to: targetPosition,
 		piece: getPieceAt(state.board, state.selectedSquare),
+		captured: getPieceAt(state.board, targetPosition),
 	};
 
 	return executeMoveAnimation(state, moveData);
@@ -390,7 +392,10 @@ export const handleComputerMove = (state, move) => {
 		console.warn("Stockfish returned no move - checking game state");
 
 		// Check for game over
-		const alertMessage = getGameOverAlert(state.board, state.currentPlayer);
+		const [alertMessage, reason] = getGameOverAlert(
+			state.board,
+			state.currentPlayer
+		);
 
 		if (alertMessage) {
 			return {
@@ -398,6 +403,7 @@ export const handleComputerMove = (state, move) => {
 				phase: GAME_PHASE.ALERT,
 				previousPhase: GAME_PHASE.GAME_OVER,
 				alert: alertMessage,
+				gameOverReason: reason,
 				animatingMove: null,
 			};
 		} else {
@@ -415,6 +421,7 @@ export const handleComputerMove = (state, move) => {
 		from,
 		to,
 		piece: getPieceAt(state.board, from),
+		captured: getPieceAt(state.board, to),
 	};
 
 	return executeMoveAnimation(state, moveData);
@@ -546,11 +553,11 @@ export const getGameOverAlert = (board, currentPlayer) => {
 		// The player who just moved won (opposite of current player)
 		const winningColor =
 			currentPlayer === Color.White ? Color.Black : Color.White;
-		return ALERT.MESSAGE.CREATE_CHECKMATE(winningColor);
+		return [ALERT.MESSAGE.CREATE_CHECKMATE(winningColor), "checkmate"];
 	} else if (isStalemate(currentPlayer, board)) {
-		return ALERT.MESSAGE.STALEMATE;
+		return [ALERT.MESSAGE.STALEMATE, "stalemate"];
 	}
-	return null;
+	return [null, null];
 };
 
 // ============================================================================
@@ -573,6 +580,12 @@ export const onAnimationComplete = (state) => {
 	// Apply the move to the board
 	const newState = applyMoveToBoard(state, state.animatingMove);
 
+	// Get lastMove convenience accessor
+	const lastMove =
+		newState.moveHistory.length > 0
+			? newState.moveHistory[newState.moveHistory.length - 1]
+			: null;
+
 	// Check if we should return to REPLAY
 	if (state.previousPhase === GAME_PHASE.REPLAY) {
 		return {
@@ -580,14 +593,20 @@ export const onAnimationComplete = (state) => {
 			phase: GAME_PHASE.REPLAY,
 			previousPhase: null,
 			animatingMove: null,
+			lastMove,
 		};
 	}
 
 	// Check for game over
-	const alertMessage = getGameOverAlert(
+	const [alertMessage, reason] = getGameOverAlert(
 		newState.board,
 		newState.currentPlayer
 	);
+
+	// Update lastMove with checkmate status if applicable
+	if (lastMove && reason === "checkmate") {
+		lastMove.resultsInCheckmate = true;
+	}
 
 	if (alertMessage) {
 		return {
@@ -595,7 +614,9 @@ export const onAnimationComplete = (state) => {
 			phase: GAME_PHASE.ALERT,
 			previousPhase: GAME_PHASE.GAME_OVER,
 			alert: alertMessage,
+			gameOverReason: reason,
 			animatingMove: null,
+			lastMove,
 		};
 	}
 
@@ -604,5 +625,6 @@ export const onAnimationComplete = (state) => {
 		phase: GAME_PHASE.WAITING_FOR_PLAYER,
 		previousPhase: null,
 		animatingMove: null,
+		lastMove,
 	};
 };

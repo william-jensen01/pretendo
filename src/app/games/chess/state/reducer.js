@@ -36,6 +36,7 @@ export const initialState = {
 	possibleMoves: [],
 	moveHistory: [],
 	capturedPieces: [],
+	lastMove: null, // Convenience accessor for last moveHistory entry
 
 	// Animation
 	animatingMove: null,

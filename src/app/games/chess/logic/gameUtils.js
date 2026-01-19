@@ -6,6 +6,7 @@ import {
 	determineSpecialMove,
 	applyMoveToBoard as applyMoveLogic,
 	reverseMoveOnBoard,
+	isInCheck,
 } from "./index";
 import { deepCopyBoard } from "../util";
 import { Queen } from "./pieces";
@@ -112,6 +113,8 @@ export const applyMoveToBoard = (state, moveData) => {
 		special: specialMove,
 		originalHasMoved,
 		originalRookHasMoved,
+		resultsInCheck: isInCheck(nextPlayer, newBoard),
+		resultsInCheckmate: false, // Set by onAnimationComplete
 	};
 
 	// Build updated state
