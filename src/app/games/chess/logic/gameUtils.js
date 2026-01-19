@@ -53,11 +53,32 @@ export const applyMoveToBoard = (state, moveData) => {
 		// Undo logic - reverse the move
 		reverseMoveOnBoard(newBoard, moveData);
 
+		// Remove captured piece from capturedPieces if this move captured a piece
+		let newCapturedPieces = state.capturedPieces;
+		if (moveData.captured) {
+			// Find and remove the last occurrence of this piece
+			const lastIndex = state.capturedPieces.length - 1;
+			for (let i = lastIndex; i >= 0; i--) {
+				const capturedPiece = state.capturedPieces[i];
+				if (
+					capturedPiece.FENChar === moveData.captured.FENChar &&
+					capturedPiece.color === moveData.captured.color
+				) {
+					newCapturedPieces = [
+						...state.capturedPieces.slice(0, i),
+						...state.capturedPieces.slice(i + 1),
+					];
+					break;
+				}
+			}
+		}
+
 		return {
 			...state,
 			board: newBoard,
 			currentPlayer:
 				state.currentPlayer === Color.White ? Color.Black : Color.White,
+			capturedPieces: newCapturedPieces,
 		};
 	}
 

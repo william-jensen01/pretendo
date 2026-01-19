@@ -344,7 +344,7 @@ export default function Chess() {
 
 		switch (state.phase) {
 			case GAME_PHASE.DATA_SCREEN:
-				setGrid(renderDataScreen(state.moveHistory, moveHelp));
+				setGrid(renderDataScreen(state.moveHistory, moveHelp, state.capturedPieces));
 				break;
 			case GAME_PHASE.MENU_ACTIONS:
 				setGrid(
@@ -376,6 +376,7 @@ export default function Chess() {
 		isGameReady,
 		state.phase,
 		state.moveHistory,
+		state.capturedPieces,
 		state.selectedOption,
 		state.board,
 		state.alert,
