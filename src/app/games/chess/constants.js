@@ -147,8 +147,8 @@ export const ACTION_MENU_OPTIONS = [
 	{ key: "setupBoard", display: "Set Up Board", disabled: true },
 	{ key: "solveForMate", display: "Solve For Mate", disabled: true },
 	{ key: "offerDraw", display: "Offer Draw", disabled: false },
-	{ key: "loadGame", display: "Load Game", disabled: true },
-	{ key: "saveGame", display: "Save Game", disabled: true },
+	{ key: "loadGame", display: "Load Game", disabled: false },
+	{ key: "saveGame", display: "Save Game", disabled: false },
 	{ key: "beginNewGame", display: "Begin New Game", disabled: false },
 ];
 
@@ -241,6 +241,11 @@ export const ALERT = {
 		NO_MOVES_TO_REPLAY: "NO MORE MOVES TO REPLAY",
 		NO_MOVES_TO_UNDO: "NO MORE MOVES TO TAKE BACK",
 		STALEMATE: "DRAW BY STALEMATE",
+		GAME_SAVED: "GAME SAVED!",
+		SAVE_FAILED: "FAILED TO SAVE GAME",
+		NO_SAVED_GAME: "NO SAVED GAME FOUND",
+		CORRUPTED_SAVE: "CORRUPTED SAVE DATA",
+		LOAD_FAILED: "FAILED TO LOAD GAME",
 	},
 	CONFIG: {
 		BOX: {

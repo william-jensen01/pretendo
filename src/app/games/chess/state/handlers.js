@@ -14,7 +14,8 @@ import {
 	applyMoveToBoard,
 } from "../logic/gameUtils";
 import { isCheckmate, isStalemate } from "../logic";
-import { parseStockfishMove } from "../logic/FENConverter";
+import { parseStockfishMove, simpleBoardToFEN, boardToFEN, historyToUCI } from "../logic/FENConverter";
+import { parseFEN, replayMovesFromFEN } from "../logic/FENParser";
 
 // ============================================================================
 // PHASE HANDLERS
@@ -36,6 +37,7 @@ export const handleWelcomingPhase = (state, action, _) => {
 				...state,
 				phase: GAME_PHASE.WAITING_FOR_PLAYER,
 				board: DEFAULT_BOARD,
+				startingBoard: DEFAULT_BOARD,
 			};
 		default:
 			console.log("Unknown action in WELCOMING phase: ", action);
@@ -522,6 +524,12 @@ export const handleMenuAction = (state, action) => {
 				stockfishOperation: { type: "offer_draw" },
 			};
 
+		case Actions.MENU_LOAD_GAME:
+			return handleLoadGame(state);
+
+		case Actions.MENU_SAVE_GAME:
+			return handleSaveGame(state);
+
 		case Actions.MENU_BEGIN_NEW_GAME:
 			return {
 				...createInitialState(),
@@ -534,6 +542,70 @@ export const handleMenuAction = (state, action) => {
 	}
 };
 
+const handleSaveGame = (state) => {
+	try {
+		// Create save data - save the process (starting position + moves)
+		const saveData = {
+			fen: simpleBoardToFEN(state.startingBoard, Color.White), // Starting position
+			moves: state.moveHistory.map((m) => m.notation), // All moves from start
+			computerColor: state.computerColor,
+		};
+
+		// Save to localStorage
+		localStorage.setItem("chess_save", JSON.stringify(saveData));
+		console.log("Game saved:", saveData);
+
+		return showAlert(state, ALERT.MESSAGE.GAME_SAVED, GAME_PHASE.WAITING_FOR_PLAYER);
+	} catch (error) {
+		console.error("Failed to save game:", error);
+		return showAlert(state, ALERT.MESSAGE.SAVE_FAILED, GAME_PHASE.WAITING_FOR_PLAYER);
+	}
+}
+
+const handleLoadGame = (state) => {
+	try {
+		// Retrieve save data
+		const savedData = localStorage.getItem("chess_save");
+		if (!savedData) {
+			return showAlert(state, ALERT.MESSAGE.NO_SAVED_GAME, GAME_PHASE.WAITING_FOR_PLAYER);
+		}
+
+		// Parse and validate
+		const saveData = JSON.parse(savedData);
+		if (!saveData.fen || !Array.isArray(saveData.moves)) {
+			return showAlert(state, ALERT.MESSAGE.CORRUPTED_SAVE, GAME_PHASE.WAITING_FOR_PLAYER);
+		}
+
+		// Parse starting position
+		const { board: startingBoard } = parseFEN(saveData.fen);
+
+		// Reconstruct current state by replaying moves from starting position
+		const reconstructed = replayMovesFromFEN(saveData.fen, saveData.moves);
+
+		console.log("Game loaded:", saveData);
+		console.log("Reconstructed state:", reconstructed);
+
+		// Return new state
+		return {
+			...createInitialState(),
+			phase: GAME_PHASE.WAITING_FOR_PLAYER,
+			startingBoard: startingBoard, // Save starting position
+			board: reconstructed.board, // Current position after replay
+			moveHistory: reconstructed.moveHistory,
+			capturedPieces: reconstructed.capturedPieces,
+			currentPlayer: reconstructed.currentPlayer,
+			lastMove:
+				reconstructed.moveHistory[reconstructed.moveHistory.length - 1] ||
+				null,
+			computerColor: saveData.computerColor,
+			redoMoveStack: [],
+		};
+	} catch (error) {
+		console.error("Failed to load game:", error);
+		return showAlert(state, ALERT.MESSAGE.LOAD_FAILED, GAME_PHASE.WAITING_FOR_PLAYER);
+	}
+}
+
 export const openMenu = (state, returnToPhase) => {
 	return {
 		...state,
@@ -542,6 +614,18 @@ export const openMenu = (state, returnToPhase) => {
 		selectedSquare: null,
 		possibleMoves: [],
 		selectedOption: 0,
+	};
+};
+
+/**
+ * Show an alert message
+ */
+export const showAlert = (state, message, returnToPhase = null) => {
+	return {
+		...state,
+		phase: GAME_PHASE.ALERT,
+		previousPhase: returnToPhase || state.phase,
+		alert: message,
 	};
 };
 

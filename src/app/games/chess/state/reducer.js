@@ -27,7 +27,8 @@ export const initialState = {
 	previousPhase: null,
 
 	// Game data
-	board: DEFAULT_BOARD, // Will be set in loadGame
+	startingBoard: DEFAULT_BOARD, // Initial position (standard or custom)
+	board: DEFAULT_BOARD, // Current position (will be set in loadGame)
 	currentPlayer: Color.White,
 	computerColor: Color.Black,
 

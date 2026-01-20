@@ -1,5 +1,32 @@
-import { HORIZONTAL_AXIS, NUM_FILES, NUM_RANKS } from "../constants";
+import { HORIZONTAL_AXIS, NUM_RANKS } from "../constants";
 import { Color } from "./models";
+
+export const simpleBoardToFEN = (board, currentPlayer) => {
+	let fen = "";
+	// Piece placement
+	for (let rank = 0; rank < 8; rank++) {
+		let emptySquares = 0;
+		for (let file = 0; file < 8; file++) {
+			const piece = board[rank][file];
+			if (!piece) {
+				emptySquares++;
+			} else {
+				if (emptySquares > 0) {
+					fen += emptySquares;
+					emptySquares = 0;
+				}
+				fen += piece.FENChar;
+			}
+		}
+		if (emptySquares > 0) fen += emptySquares;
+		if (rank < 7) fen += "/";
+	}
+
+	// Active color
+	fen += currentPlayer === Color.White ? " w" : " b";
+
+	return fen;
+}
 
 export const boardToFEN = (board, currentPlayer, lastMove) => {
 	let fen = "";
@@ -65,7 +92,8 @@ export const getCastlingRights = (board) => {
 		if (
 			whiteKingsideRook &&
 			whiteKingsideRook.FENChar === "R" &&
-			!whiteKingsideRook.hasMoved
+			!whiteKingsideRook.hasMoved &&
+			whiteKing.canCastle({row: 7, col: 4}, {row: 7, col: 6}, board)
 		) {
 			rights += "K";
 		}
@@ -74,7 +102,8 @@ export const getCastlingRights = (board) => {
 		if (
 			whiteQueensideRook &&
 			whiteQueensideRook.FENChar === "R" &&
-			!whiteQueensideRook.hasMoved
+			!whiteQueensideRook.hasMoved &&
+			whiteKing.canCastle({row: 7, col: 4}, {row: 7, col: 2}, board)
 		) {
 			rights += "Q";
 		}
@@ -82,13 +111,17 @@ export const getCastlingRights = (board) => {
 
 	// Black king on e8
 	const blackKing = board[0][4];
-	if (blackKing && blackKing.FENChar === "k" && !blackKing.hasMoved) {
+	if (
+		blackKing &&
+		blackKing.FENChar === "k" &&
+		!blackKing.hasMoved) {
 		// Check kingside rook
 		const whiteKingsideRook = board[0][7];
 		if (
 			whiteKingsideRook &&
 			whiteKingsideRook.FENChar === "r" &&
-			!whiteKingsideRook.hasMoved
+			!whiteKingsideRook.hasMoved &&
+			blackKing.canCastle({row: 0, col: 4}, {row: 0, col: 6}, board)
 		) {
 			rights += "k";
 		}
@@ -97,7 +130,8 @@ export const getCastlingRights = (board) => {
 		if (
 			whiteQueensideRook &&
 			whiteQueensideRook.FENChar === "r" &&
-			!whiteQueensideRook.hasMoved
+			!whiteQueensideRook.hasMoved &&
+			blackKing.canCastle({row: 0, col: 4}, {row: 0, col: 2}, board)
 		) {
 			rights += "q";
 		}
