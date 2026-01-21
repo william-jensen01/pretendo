@@ -75,6 +75,7 @@ export default function Chess() {
 		mateInMoves: 1,
 		level: 1,
 		teachingMode: false,
+		coordinates: true,
 		touchingRule: false,
 		// From setup menu
 		firstMove: "white",
@@ -103,15 +104,17 @@ export default function Chess() {
 
 	// Compute grid based on board and state
 	const boardGrid = useMemo(() => {
-		const next = staticGridRef.current.map((row) => [...row]);
+		const next = createStaticChessGrid(gameSettings.coordinates);
 		renderBoardPieces(
 			state.board,
 			next,
 			state.selectedSquare,
-			gameSettings.teachingMode ? state.possibleMoves : null, // Only show possible moves in teaching mode
+			state.possibleMoves,
+			null,
+			gameSettings,
 		);
 		return next;
-	}, [state.board, state.selectedSquare, state.possibleMoves, gameSettings.teachingMode]);
+	}, [state.board, state.selectedSquare, state.possibleMoves, gameSettings]);
 
 	const loadGame = useCallback(async () => {
 		dispatch({ type: Actions.INITIALIZATION_COMPLETE });

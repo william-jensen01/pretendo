@@ -117,7 +117,8 @@ export const renderBoardPieces = (
 	staticGrid,
 	selectedSquare,
 	possibleMoves,
-	animating = null
+	animating = null,
+	gameSettings = {},
 ) => {
 	const loopPiece = (piece, [rOffset, cOffset] = [0, 0]) => {
 		for (let r = 0; r < piece.length; r++) {
@@ -166,7 +167,7 @@ export const renderBoardPieces = (
 		});
 	});
 
-	if (possibleMoves && possibleMoves.length > 0) {
+	if (gameSettings?.teachingMode && possibleMoves && possibleMoves.length > 0) {
 		possibleMoves.forEach(({ row, col }) => {
 			const gCol = col * SQUARE_SIZE + BOARD_OFFSET;
 			const gRow = row * SQUARE_SIZE + BOARD_OFFSET;
