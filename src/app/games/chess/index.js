@@ -77,6 +77,8 @@ export default function Chess() {
 		teachingMode: false,
 		coordinates: true,
 		touchingRule: false,
+		whiteVisible: true,
+		blackVisible: true,
 		// From setup menu
 		firstMove: "white",
 	});
@@ -387,7 +389,7 @@ export default function Chess() {
 				);
 				break;
 			case GAME_PHASE.SETUP_BOARD:
-				setGrid(renderSetupScreen(state.board));
+				setGrid(renderSetupScreen(state.board, gameSettings));
 				break;
 			case GAME_PHASE.SETUP_MENU:
 				setGrid(renderMenuScreen(
@@ -398,7 +400,7 @@ export default function Chess() {
 				))
 				break;
 			case GAME_PHASE.ALERT:
-				setGrid(renderAlertScreen(state.alert, state.board));
+				setGrid(renderAlertScreen(state.alert, state.board, gameSettings));
 				break;
 			default:
 				setGrid(boardGrid);
@@ -442,10 +444,10 @@ export default function Chess() {
 		}
 
 		const buildAnimatedGrid = () => {
-			const next = staticGridRef.current.map((row) => [...row]);
+			const next = createStaticChessGrid(gameSettings.coordinates);
 			const animating = animatingPieceRef.current;
 
-			renderBoardPieces(state.board, next, null, null, animating);
+			renderBoardPieces(state.board, next, null, null, animating, gameSettings);
 
 			if (animating) {
 				const pieceArr = presets.getPiece(animating.piece.FENChar);
@@ -540,6 +542,7 @@ export default function Chess() {
 		state.currentPlayer,
 		state.computerColor,
 		setGrid,
+		gameSettings,
 	]);
 
 	// Unified cursor management: display and cells

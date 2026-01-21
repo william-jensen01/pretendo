@@ -161,9 +161,13 @@ export const renderBoardPieces = (
 				return;
 			}
 
-			// Render piece if it exists and isn't selected
+			// Render piece if it exists and color is visible
 			const pieceArr = presets.getPiece(piece.FENChar);
-			if (pieceArr) loopPiece(pieceArr, [gRow, gCol]);
+			const isWhite = piece.color === Color.White;
+			const isBlack = piece.color === Color.Black;
+			if (pieceArr && ((isWhite && gameSettings?.whiteVisible) || (isBlack && gameSettings?.blackVisible))) {
+				loopPiece(pieceArr, [gRow, gCol]);
+			}
 		});
 	});
 
@@ -631,10 +635,10 @@ export const renderMenuScreen = (
 	return grid;
 };
 
-export const renderAlertScreen = (alertText, board) => {
+export const renderAlertScreen = (alertText, board, gameSettings) => {
 	// Create a chess grid with no coordinates
 	const grid = createStaticChessGrid(false);
-	renderBoardPieces(board, grid, null, null, null, false);
+	renderBoardPieces(board, grid, null, null, null, false, gameSettings);
 
 	// Constants
 	const {
@@ -740,7 +744,7 @@ export const renderAlertScreen = (alertText, board) => {
 
 
 
-export const renderSetupScreen = (board) => {
+export const renderSetupScreen = (board, gameSettings) => {
 	const grid = create2dArray();
 
 	// BORDER
@@ -793,7 +797,7 @@ export const renderSetupScreen = (board) => {
 		});
 	});
 
-	renderBoardPieces(board, grid, null, null, null);
+	renderBoardPieces(board, grid, null, null, null, gameSettings);
 
 	return grid;
 };

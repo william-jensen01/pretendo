@@ -212,14 +212,14 @@ export const SETTINGS_MENU_OPTIONS = [
 		display: "White .",
 		values: [true, false],
 		labels: ["Visible", "Hidden"],
-		disabled: true,
+		disabled: false,
 	},
 	{
 		key: "blackVisible",
 		display: "Black .",
 		values: [true, false],
 		labels: ["Visible", "Hidden"],
-		disabled: true,
+		disabled: false,
 	},
 	{
 		key: "whitePosition",
