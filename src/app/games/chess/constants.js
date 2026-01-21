@@ -184,7 +184,7 @@ export const SETTINGS_MENU_OPTIONS = [
 		display: "Teaching Mode .",
 		values: [true, false],
 		labels: ["On", "Off"],
-		disabled: true,
+		disabled: false,
 	},
 	{
 		key: "coordinates",

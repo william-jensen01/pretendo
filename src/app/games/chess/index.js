@@ -75,6 +75,7 @@ export default function Chess() {
 		// From settings menu
 		mateInMoves: 1,
 		level: 1,
+		teachingMode: false,
 		// From setup menu
 		firstMove: "white",
 	});
@@ -107,10 +108,10 @@ export default function Chess() {
 			state.board,
 			next,
 			state.selectedSquare,
-			state.possibleMoves
+			gameSettings.teachingMode ? state.possibleMoves : null, // Only show possible moves in teaching mode
 		);
 		return next;
-	}, [state.board, state.selectedSquare, state.possibleMoves]);
+	}, [state.board, state.selectedSquare, state.possibleMoves, gameSettings.teachingMode]);
 
 	const loadGame = useCallback(async () => {
 		dispatch({ type: Actions.INITIALIZATION_COMPLETE });
