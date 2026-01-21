@@ -6,7 +6,7 @@ import { applyMoveToBoard, determineSpecialMove, isInCheck } from "./index";
 /**
  * Map FEN characters to piece classes
  */
-const FEN_PIECE_MAP = {
+export const FEN_PIECE_MAP = {
 	P: (color) => new Pawn(color),
 	N: (color) => new Knight(color),
 	B: (color) => new Bishop(color),

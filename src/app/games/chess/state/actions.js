@@ -27,11 +27,18 @@ export const Actions = {
 	MENU_CHANGE_SIDES: "changeSides",
 	MENU_FORCE_MOVE: "forceMove",
 	MENU_TAKEBACK_REPLAY: "takebackReplay",
+	MENU_SETUP_BOARD: "setupBoard",
 	MENU_OFFER_DRAW: "offerDraw",
 	MENU_LOAD_GAME: "loadGame",
 	MENU_SAVE_GAME: "saveGame",
 	MENU_BEGIN_NEW_GAME: "beginNewGame",
 	MENU_CLOSE: "closeMenu",
+
+	SETUP_CLEAR_BOARD: "clearBoard",
+	SETUP_INITIAL_POSITION: "initialPosition",
+	SETUP_FIRST_MOVE: "firstMove",
+	SETUP_COMPLETE: "setupComplete",
+	SETUP_ABANDON_CHANGES: "abandonChanges",
 };
 
 /**

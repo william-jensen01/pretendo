@@ -144,7 +144,7 @@ export const ACTION_MENU_OPTIONS = [
 	{ key: "changeSides", display: "Change Sides", disabled: false },
 	{ key: "forceMove", display: "Force Move", disabled: false },
 	{ key: "takebackReplay", display: "Takeback/Replay", disabled: false },
-	{ key: "setupBoard", display: "Set Up Board", disabled: true },
+	{ key: "setupBoard", display: "Set Up Board", disabled: false },
 	{ key: "solveForMate", display: "Solve For Mate", disabled: true },
 	{ key: "offerDraw", display: "Offer Draw", disabled: false },
 	{ key: "loadGame", display: "Load Game", disabled: false },
@@ -289,3 +289,45 @@ export const ALERT = {
  *
  * Draw Accepted
  */
+
+export const SETUP_MENU_OPTIONS = [
+	{
+		key: "clearBoard",
+		display: "Clear the Board",
+		disabled: false,
+	},
+	{
+		key: "initialPosition",
+		display: "Initial Position",
+		disabled: false,
+	},
+	{
+		key: "firstMove",
+		display: "First Move .",
+		values: ["white", "black"],
+		labels: ["White", "Black"],
+		disabled: false,
+	},
+	{
+		key: "setupComplete",
+		display: "Setup Complete",
+		disabled: false,
+	},
+	{
+		key: "abandonChanges",
+		display: "Abandon Changes",
+		disabled: false,
+	},
+];
+
+// Empty but has both kings
+export const BASIC_BOARD = [
+	[null, null, null, null, new King(Color.Black), null, null, null],
+	[null, null, null, null, null, null, null, null],
+	[null, null, null, null, null, null, null, null],
+	[null, null, null, null, null, null, null, null],
+	[null, null, null, null, null, null, null, null],
+	[null, null, null, null, null, null, null, null],
+	[null, null, null, null, null, null, null, null],
+	[null, null, null, null, new King(Color.White), null, null, null],
+];

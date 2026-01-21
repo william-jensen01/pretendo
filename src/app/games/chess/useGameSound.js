@@ -178,7 +178,7 @@ export function useGameSound({state, delayStockfishRef, prevSelectedOptionRef}) 
 	useEffect(() => {
 		const isInMenu =
 			state.phase === GAME_PHASE.MENU_ACTIONS ||
-			state.phase === GAME_PHASE.MENU_SETTINGS;
+			state.phase === GAME_PHASE.MENU_SETTINGS || state.phase === GAME_PHASE.SETUP_MENU;
 		const optionChanged =
 			state.selectedOption !== prevSelectedOptionRef.current;
 		if (isInMenu && optionChanged) {

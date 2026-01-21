@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { SKILL_LEVEL } from "../constants";
+import { SKILL_LEVEL, DEFAULT_BOARD } from "../constants";
 import { useGameBoyStore } from "@/app/store/gameboy";
+import { boardToFEN } from "./FENConverter";
+import { Color } from "./models";
 
 const calculateStats = (skillLevel) => {
 	return {
@@ -10,13 +12,16 @@ const calculateStats = (skillLevel) => {
 	};
 };
 
-export const useStockfish = (skillLevel) => {
+const defaultStartingFEN = boardToFEN(DEFAULT_BOARD, Color.White, null);
+
+export const useStockfish = (skillLevel, startingFEN = defaultStartingFEN) => {
 	const engineRef = useRef(null);
 	const [isReady, setIsReady] = useState(false);
 	const pendingRequestRef = useRef(false);
 	const lastMovesRef = useRef(null);
 	const searchingRef = useRef(false);
 	const onMoveCallbackRef = useRef(null);
+	const startingFENRef = useRef(startingFEN);
 
 	const hintingRef = useRef(false);
 	const onHintCallbackRef = useRef(null);
@@ -48,6 +53,11 @@ export const useStockfish = (skillLevel) => {
 
 		configuredRef.current = true;
 	}, []);
+
+	// Update starting FEN ref when prop changes
+	useEffect(() => {
+		startingFENRef.current = startingFEN;
+	}, [startingFEN]);
 
 	useEffect(() => {
 		if (typeof window === "undefined" || initializing) return;
@@ -206,7 +216,7 @@ export const useStockfish = (skillLevel) => {
 			onMoveCallbackRef.current = onMove;
 
 			// Set position and search
-			engineRef.current.postMessage(`position startpos moves ${moveStr}`);
+			engineRef.current.postMessage(`position fen ${startingFENRef.current} moves ${moveStr}`);
 			engineRef.current.postMessage(
 				`go depth ${pendingConfigRef.current.depth}`
 			);
@@ -234,7 +244,7 @@ export const useStockfish = (skillLevel) => {
 			onHintCallbackRef.current = callback;
 
 			engineRef.current.postMessage("setoption name MultiPV value 2");
-			engineRef.current.postMessage(`position startpos moves ${moveStr}`);
+			engineRef.current.postMessage(`position fen ${startingFENRef.current} moves ${moveStr}`);
 			engineRef.current.postMessage("go depth 2");
 		},
 		[isReady, stopSearch]
@@ -317,7 +327,7 @@ export const useStockfish = (skillLevel) => {
 			};
 
 			// Run evaluation
-			engineRef.current.postMessage(`position startpos moves ${moves}`);
+			engineRef.current.postMessage(`position fen ${startingFENRef.current} moves ${moves}`);
 			engineRef.current.postMessage("go depth 8");
 		},
 		[isReady, decideDrawAcceptance]

@@ -3,6 +3,8 @@ import {
 	ACTION_MENU_OPTIONS,
 	SETTINGS_MENU_OPTIONS,
 	ALERT,
+	SETUP_MENU_OPTIONS,
+	BASIC_BOARD
 } from "../constants";
 import { Color } from "../logic/models";
 import { Actions } from "./actions";
@@ -14,8 +16,9 @@ import {
 	applyMoveToBoard,
 } from "../logic/gameUtils";
 import { isCheckmate, isStalemate } from "../logic";
-import { parseStockfishMove, simpleBoardToFEN, boardToFEN, historyToUCI } from "../logic/FENConverter";
-import { parseFEN, replayMovesFromFEN } from "../logic/FENParser";
+import { parseStockfishMove, simpleBoardToFEN } from "../logic/FENConverter";
+import { parseFEN, replayMovesFromFEN, FEN_PIECE_MAP } from "../logic/FENParser";
+import { getBorderPieceAt, getHoveredSquare, deepCopyBoard } from "../util";
 
 // ============================================================================
 // PHASE HANDLERS
@@ -289,6 +292,53 @@ export const handleAlertPhase = (state, action, _) => {
 	}
 };
 
+export const handleSetupBoardPhase = (state, action, payload) => {
+	switch (action) {
+		case Actions.SELECT_BUTTON:
+			// Open setup menu
+			return {
+				...state,
+				phase:  GAME_PHASE.SETUP_MENU
+			}
+		case Actions.A_BUTTON:
+			return handleSetupSelectPiece(state, action, payload);
+
+		case Actions.B_BUTTON:
+			// Cancel move
+			return {
+				...state,
+				selectedSetupPiece: null
+			}
+
+		default:
+			return state;
+	}
+}
+
+export const handleSetupMenuPhase = (state, action, payload) => {
+	switch (action) {
+		case Actions.SELECT_BUTTON:
+			return {
+				...state,
+				phase: GAME_PHASE.SETUP_BOARD,
+			};
+
+		case Actions.A_BUTTON:
+			return handleSetupMenuAction(state, payload);
+
+		case Actions.DPAD:
+			// Navigate settings options
+			return handleMenuNavigation(
+				state,
+				payload.r,
+				SETUP_MENU_OPTIONS
+			);
+
+		default:
+			return state;
+	}
+}
+
 // ============================================================================
 // ACTION HANDLERS
 // ============================================================================
@@ -516,6 +566,20 @@ export const handleMenuAction = (state, action) => {
 				phase: GAME_PHASE.REPLAY,
 			};
 
+		case Actions.MENU_SETUP_BOARD:
+			return {
+				...state,
+				phase: GAME_PHASE.SETUP_BOARD,
+				selectedOption: 0,
+				selectedSetupPiece: null,
+				possibleMoves: [],
+				capturedPieces: [],
+				moveHistory: [],
+				lastMove: null,
+				redoMoveStack: [],
+				selectedSquare: null,
+			}
+
 		case Actions.MENU_OFFER_DRAW:
 			return {
 				...state,
@@ -542,6 +606,115 @@ export const handleMenuAction = (state, action) => {
 	}
 };
 
+const handleSetupMenuAction = (state, payload) => {
+	switch (payload.selectedAction) {
+		case Actions.SETUP_CLEAR_BOARD:
+			return {
+				...state,
+				board: BASIC_BOARD,
+				phase: GAME_PHASE.SETUP_BOARD,
+			}
+		case Actions.SETUP_INITIAL_POSITION:
+			return {
+				...state,
+				board: DEFAULT_BOARD,
+				phase: GAME_PHASE.SETUP_BOARD,
+			}
+		case Actions.SETUP_FIRST_MOVE:
+			const newColor = payload.color === "white" ? Color.White : Color.Black;
+			return {
+				...state,
+				pendingFirstMove: newColor 
+			}
+		case Actions.SETUP_COMPLETE:
+			return {
+				...state,
+				phase: GAME_PHASE.WAITING_FOR_PLAYER,
+				// board is modified during setup, so we don't need to redeclare it
+				startingBoard: state.board,
+				currentPlayer: state.pendingFirstMove,
+				firstMove: state.pendingFirstMove,
+				pendingFirstMove: null,
+			}
+		case Actions.SETUP_ABANDON_CHANGES:
+			return {
+				...state,
+				board: DEFAULT_BOARD,
+				phase: GAME_PHASE.WAITING_FOR_PLAYER,
+				pendingFirstMove: null,
+			}
+		default:
+			return state;
+	}
+}
+
+const handleSetupSelectPiece = (state, action, payload) => {
+	// Check if we're over a border piece
+	const borderPiece = getBorderPieceAt();
+
+	// Check if we're over a board square
+	const hoveredSquare = getHoveredSquare(state.board);
+
+	// CASE 1: No piece selected - pick up a piece
+	if (!state.selectedSetupPiece) {
+		// Try to pick up from border
+		if (borderPiece) {
+			const piece = FEN_PIECE_MAP[borderPiece.FENChar](borderPiece.color);
+			return {
+				...state,
+				selectedSetupPiece: piece
+			};
+		}
+
+		// Try to pick up from board
+		if (hoveredSquare && hoveredSquare.piece) {
+			const newBoard = deepCopyBoard(state.board);
+
+			// Remove piece from board, will become cursor
+			newBoard[hoveredSquare.row][hoveredSquare.col] = null;
+
+			return {
+				...state,
+				board: newBoard,
+				selectedSetupPiece: hoveredSquare.piece
+			};
+		}
+
+		return state;
+	}
+
+	// CASE 2: Piece is selected - place or remove it
+	else {
+		// Check if placing in border (removal)
+		if (borderPiece) {
+			// Don't allow removing kings - they're required
+			if (state.selectedSetupPiece.FENChar.toUpperCase() === 'K') {
+				return state;
+			}
+
+			// Remove the piece
+			return {
+				...state,
+				selectedSetupPiece: null
+			};
+		}
+
+		// Place piece on board square
+		if (hoveredSquare) {
+			const newBoard = deepCopyBoard(state.board);
+			newBoard[hoveredSquare.row][hoveredSquare.col] = state.selectedSetupPiece;
+
+			return {
+				...state,
+				board: newBoard,
+				selectedSetupPiece: null
+			};
+		}
+
+		return state;
+	}
+}
+
 const handleSaveGame = (state) => {
 	try {
 		// Create save data - save the process (starting position + moves)
@@ -549,6 +722,7 @@ const handleSaveGame = (state) => {
 			fen: simpleBoardToFEN(state.startingBoard, Color.White), // Starting position
 			moves: state.moveHistory.map((m) => m.notation), // All moves from start
 			computerColor: state.computerColor,
+			firstMove: state.firstMove, // Color of first move (for custom setups)
 		};
 
 		// Save to localStorage
@@ -598,6 +772,7 @@ const handleLoadGame = (state) => {
 				reconstructed.moveHistory[reconstructed.moveHistory.length - 1] ||
 				null,
 			computerColor: saveData.computerColor,
+			firstMove: saveData.firstMove || Color.White, // Restore firstMove or default to White
 			redoMoveStack: [],
 		};
 	} catch (error) {

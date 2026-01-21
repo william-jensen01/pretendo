@@ -18,6 +18,7 @@ import * as presets from "./presets";
 import { useGameBoyStore } from "@/app/store/gameboy";
 import { Color } from "./logic/models";
 import { Pawn } from "./logic/pieces";
+import { GAME_PHASE } from "./state/states";
 
 export const createStaticChessGrid = (showCoords = true) => {
 	const grid = create2dArray();
@@ -243,6 +244,81 @@ export const getHoveredSquare = (board) => {
 	return bestSquare;
 };
 
+export const getBorderPieceAt = () => {
+	const cursor = useGameBoyStore.getState().cursor;
+	const cursorRowStart = cursor.row;
+	const cursorRowEnd = cursor.row + cursor.cells.length;
+	const cursorColStart = cursor.col;
+	const cursorColEnd = cursor.col + cursor.cells[0].length;
+
+	// Define the static border pieces
+	// Order: Q, R, B, N, P
+	const pieces = ["Q", "R", "B", "N", "P"];
+	const pROffset = 16;
+	const pieceSize = 16;
+	const pieceSpacing = 24; // 16 + 8 gap
+
+	let bestPiece = null;
+	let bestArea = 0;
+
+	pieces.forEach((piece, idx) => {
+		const pieceRowStart = pROffset + idx * pieceSpacing;
+		const pieceRowEnd = pieceRowStart + pieceSize;
+
+		// Check left side (white pieces)
+		const leftColStart = 0;
+		const leftColEnd = pieceSize;
+
+		const leftOverlapRowStart = Math.max(cursorRowStart, pieceRowStart);
+		const leftOverlapRowEnd = Math.min(cursorRowEnd, pieceRowEnd);
+		const leftOverlapColStart = Math.max(cursorColStart, leftColStart);
+		const leftOverlapColEnd = Math.min(cursorColEnd, leftColEnd);
+
+		const leftOverlapWidth = leftOverlapColEnd - leftOverlapColStart;
+		const leftOverlapHeight = leftOverlapRowEnd - leftOverlapRowStart;
+
+		if (leftOverlapWidth > 0 && leftOverlapHeight > 0) {
+			const area = leftOverlapWidth * leftOverlapHeight;
+			if (area > bestArea) {
+				bestArea = area;
+				bestPiece = {
+					FENChar: piece.toUpperCase(),
+					color: Color.White,
+					row: pieceRowStart,
+					col: leftColStart,
+				};
+			}
+		}
+
+		// Check right side (black pieces)
+		const rightColStart = columns - pieceSize - 1; // Match renderSetupScreen: columns - 16 - 1
+		const rightColEnd = rightColStart + pieceSize;
+
+		const rightOverlapRowStart = Math.max(cursorRowStart, pieceRowStart);
+		const rightOverlapRowEnd = Math.min(cursorRowEnd, pieceRowEnd);
+		const rightOverlapColStart = Math.max(cursorColStart, rightColStart);
+		const rightOverlapColEnd = Math.min(cursorColEnd, rightColEnd);
+
+		const rightOverlapWidth = rightOverlapColEnd - rightOverlapColStart;
+		const rightOverlapHeight = rightOverlapRowEnd - rightOverlapRowStart;
+
+		if (rightOverlapWidth > 0 && rightOverlapHeight > 0) {
+			const area = rightOverlapWidth * rightOverlapHeight;
+			if (area > bestArea) {
+				bestArea = area;
+				bestPiece = {
+					FENChar: piece.toLowerCase(),
+					color: Color.Black,
+					row: pieceRowStart,
+					col: rightColStart,
+				};
+			}
+		}
+	});
+
+	return bestPiece;
+};
+
 // DATA SCREEN
 
 export const renderText = (
@@ -455,6 +531,8 @@ export const renderMenuScreen = (
 			? MENU_SCREEN_CONFIG.ACTIONS.MARGIN_BOTTOM
 			: phase === 2
 			? MENU_SCREEN_CONFIG.SETTINGS.MARGIN_BOTTOM
+			: phase === GAME_PHASE.SETUP_MENU
+			? 56 + 4
 			: 0;
 
 	// Outlines
@@ -500,6 +578,8 @@ export const renderMenuScreen = (
 		renderText("Actions", grid, 24, 56, MENU_SCREEN_CONFIG.COLOR.SUBMENU);
 	} else if (phase === 2) {
 		renderText("Settings", grid, 24, 48, MENU_SCREEN_CONFIG.COLOR.SUBMENU);
+	} else if (phase === GAME_PHASE.SETUP_MENU) {
+		renderText("Setup Menu", grid, 24, 40, 1);
 	}
 
 	// Render the menu options and the arrow on selected option
@@ -653,6 +733,66 @@ export const renderAlertScreen = (alertText, board) => {
 		const centeredCol = textStartCol + horizontalOffset;
 		renderText(line, grid, rowOffset, centeredCol, ALERT_COLOR.TEXT);
 	});
+
+	return grid;
+};
+
+
+
+export const renderSetupScreen = (board) => {
+	const grid = create2dArray();
+
+	// BORDER
+	for (let t = 0; t < 16; t++) {
+		// Left and Right Vertical Borders
+		for (let r = 0; r < rows; r++) {
+			grid[r][t] = new Cell({ color: 1 });
+			grid[r][columns - 1 - t] = new Cell({ color: 1 });
+		}
+
+		// Top Horizontal Border
+		for (let c = 0; c < columns; c++) {
+			grid[t][c] = new Cell({
+				color: 1,
+			});
+		}
+	}
+
+	// BOARD SQUARE COLORS
+	for (let r = 0; r < 8; r++) {
+		for (let c = 0; c < 8; c++) {
+			const gRow = r * SQUARE_SIZE + BOARD_OFFSET;
+			const gCol = c * SQUARE_SIZE + BOARD_OFFSET;
+			const color = (r + c) % 2 === 0 ? 0 : 3;
+
+			for (let sr = 0; sr < SQUARE_SIZE; sr++) {
+				for (let sc = 0; sc < SQUARE_SIZE; sc++) {
+					grid[gRow + sr][gCol + sc] = new Cell({ color });
+				}
+			}
+		}
+	}
+
+	// STATIC PIECES
+	const pieces = ["Q", "R", "B", "N", "P"];
+	const pROffset = 16;
+	pieces.forEach((piece, idx) => {
+		// Render white piece
+		const wPieceArr = presets.getPiece(piece.toUpperCase());
+		renderPieceAt(grid, wPieceArr, {
+			row: pROffset + idx * (16 + 8),
+			col: 0,
+		});
+
+		// Render black piece
+		const bPieceArr = presets.getPiece(piece.toLowerCase());
+		renderPieceAt(grid, bPieceArr, {
+			row: pROffset + idx * (16 + 8),
+			col: columns - 16 - 1,
+		});
+	});
+
+	renderBoardPieces(board, grid, null, null, null);
 
 	return grid;
 };

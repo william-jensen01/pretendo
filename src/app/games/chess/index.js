@@ -16,6 +16,7 @@ import {
 	ANIMATION_SPEED,
 	ACTION_MENU_OPTIONS,
 	SETTINGS_MENU_OPTIONS,
+	SETUP_MENU_OPTIONS
 } from "./constants";
 import {
 	createStaticChessGrid,
@@ -25,6 +26,7 @@ import {
 	renderDataScreen,
 	renderMenuScreen,
 	renderAlertScreen,
+	renderSetupScreen,
 } from "./util";
 import * as presets from "./presets";
 import { useGameBoyStore } from "@/app/store/gameboy";
@@ -32,7 +34,7 @@ import { rows, columns } from "@/app/constants";
 import Cell from "@/app/Cell";
 import { delay, continuouslyAnimate } from "@/app/util/helper";
 import { useStockfish } from "./logic/useStockfish";
-import { historyToUCI } from "./logic/FENConverter";
+import { historyToUCI, boardToFEN } from "./logic/FENConverter";
 import { gameReducer, createInitialState } from "./state/reducer";
 import {
 	Actions,
@@ -73,8 +75,8 @@ export default function Chess() {
 		// From settings menu
 		mateInMoves: 1,
 		level: 1,
-		deepThinking: "Off",
-		sound: "On",
+		// From setup menu
+		firstMove: "white",
 	});
 	const animatingPieceRef = useRef(null);
 	const animationRef = useRef({ running: false });
@@ -88,8 +90,13 @@ export default function Chess() {
 		[state.phase]
 	);
 
+	// Calculate starting FEN from startingBoard for Stockfish
+	const startingFEN = useMemo(() => {
+		return boardToFEN(state.startingBoard, state.firstMove, null);
+	}, [state.startingBoard, state.firstMove]);
+
 	const { isReady, getBestMove, newGame, getHint, offerDraw, forceMove } =
-		useStockfish(1);
+		useStockfish(1, startingFEN);
 
 	const soundPlayingRef = useGameSound({state, delayStockfishRef, prevSelectedOptionRef})
 
@@ -167,14 +174,14 @@ export default function Chess() {
 			// Handle menu option selection (both ACTIONS and SETTINGS)
 			if (
 				state.phase !== GAME_PHASE.MENU_ACTIONS &&
-				state.phase !== GAME_PHASE.MENU_SETTINGS
+				state.phase !== GAME_PHASE.MENU_SETTINGS && state.phase !== GAME_PHASE.SETUP_MENU
 			)
 				return;
 
 			const menuOptions =
 				state.phase === GAME_PHASE.MENU_ACTIONS
 					? ACTION_MENU_OPTIONS
-					: SETTINGS_MENU_OPTIONS;
+					: state.phase === GAME_PHASE.MENU_SETTINGS ? SETTINGS_MENU_OPTIONS : state.phase === GAME_PHASE.SETUP_MENU ? SETUP_MENU_OPTIONS : null;
 
 			const option = menuOptions[state.selectedOption];
 			if (!option || option?.disabled) return;
@@ -186,9 +193,19 @@ export default function Chess() {
 						prev[option.key]
 					);
 					const nextIndex = (currentIndex + 1) % option.values.length;
+					const nextValue = option.values[nextIndex];
+
+					// If this is firstMove in setup menu, also update currentPlayer in state
+					if (state.phase === GAME_PHASE.SETUP_MENU && option.key === "firstMove") {
+						dispatch({
+							type: Actions.A_BUTTON,
+							payload: { selectedAction: option.key, color: nextValue },
+						});
+					}
+
 					return {
 						...prev,
-						[option.key]: option.values[nextIndex],
+						[option.key]: nextValue,
 					};
 				});
 				return;
@@ -211,7 +228,7 @@ export default function Chess() {
 				// Handle menu option selection (both ACTIONS and SETTINGS)
 				if (
 					state.phase === GAME_PHASE.MENU_ACTIONS ||
-					state.phase === GAME_PHASE.MENU_SETTINGS
+					state.phase === GAME_PHASE.MENU_SETTINGS || state.phase === GAME_PHASE.SETUP_MENU
 				) {
 					return handleMenuGameAction(e);
 				}
@@ -365,6 +382,17 @@ export default function Chess() {
 						state.selectedOption
 					)
 				);
+				break;
+			case GAME_PHASE.SETUP_BOARD:
+				setGrid(renderSetupScreen(state.board));
+				break;
+			case GAME_PHASE.SETUP_MENU:
+				setGrid(renderMenuScreen(
+					GAME_PHASE.SETUP_MENU,
+					SETUP_MENU_OPTIONS,
+					gameSettings,
+					state.selectedOption
+				))
 				break;
 			case GAME_PHASE.ALERT:
 				setGrid(renderAlertScreen(state.alert, state.board));
@@ -536,6 +564,16 @@ export default function Chess() {
 			case GAME_PHASE.MENU_SETTINGS:
 				display = false;
 				break;
+			case GAME_PHASE.SETUP_MENU:
+				display = false;
+				break;
+			case GAME_PHASE.SETUP_BOARD:
+				display = true;
+				if (state.selectedSetupPiece) {
+					const pieceArr = presets.getPiece(state.selectedSetupPiece.FENChar);
+					cells = pieceArr || presets.cursor;
+				}
+				break;
 			case GAME_PHASE.REPLAY:
 				cells = presets.takebackReplay;
 				break;
@@ -569,6 +607,7 @@ export default function Chess() {
 		state.phase,
 		state.previousPhase,
 		state.selectedSquare,
+		state.selectedSetupPiece,
 		state.board,
 		state.currentPlayer,
 		state.computerColor,

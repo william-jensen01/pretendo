@@ -14,6 +14,8 @@ import {
 	handleWaitingForStockfishPhase,
 	handleComputerMove,
 	handleAlertPhase,
+	handleSetupBoardPhase,
+	handleSetupMenuPhase,
 } from "./handlers";
 import { Actions } from "./actions";
 import { GAME_PHASE } from "./states";
@@ -55,6 +57,11 @@ export const initialState = {
 
 	// Alert message
 	alert: null,
+
+	// Setup mode
+	selectedSetupPiece: null, // Piece being carried during setup
+	firstMove: Color.White, // Color of first move turn
+	pendingFirstMove: null, // Pending value that will be set when setup completes
 };
 
 // ============================================================================
@@ -129,6 +136,14 @@ function transition(state, action, payload = {}) {
 
 		case GAME_PHASE.ALERT:
 			nextState = handleAlertPhase(state, action, payload);
+			break;
+
+		case GAME_PHASE.SETUP_BOARD:
+			nextState = handleSetupBoardPhase(state, action, payload);
+			break;
+		
+		case GAME_PHASE.SETUP_MENU:
+			nextState = handleSetupMenuPhase(state, action, payload);
 			break;
 
 		default:
