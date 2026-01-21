@@ -205,7 +205,7 @@ export const SETTINGS_MENU_OPTIONS = [
 		display: "Touching Rule .",
 		values: [true, false],
 		labels: ["On", "Off"],
-		disabled: true,
+		disabled: false,
 	},
 	{
 		key: "whiteVisible",

@@ -52,7 +52,7 @@ export const handleWaitingForPlayerPhase = (state, action, payload) => {
 	switch (action) {
 		case Actions.A_BUTTON:
 			// Select piece at cursor position
-			return handleSelectPiece(state, payload.cursorPosition);
+			return handleSelectPiece(state);
 
 		case Actions.B_BUTTON:
 			// Takeback/replay
@@ -87,14 +87,13 @@ export const handlePieceSelectedPhase = (state, action, payload) => {
 	switch (action) {
 		case Actions.A_BUTTON:
 			// Attempt to move piece to cursor position
-			return handleMovePiece(state, payload.cursorPosition);
+			return handleMovePiece(state, payload.touchingRule);
 		case Actions.B_BUTTON:
-			// Cancel move
-			return handleCancelMove(state);
-
-		case Actions.SELECT_BUTTON:
-			// Open menu (clears piece selection)
-			return openMenu(state, GAME_PHASE.WAITING_FOR_PLAYER);
+			// Cancel move when touching rule is disabled
+			if (!payload.touchingRule) {
+				return handleCancelMove(state);
+			}
+			return state;
 
 		case Actions.DPAD:
 			// Move cursor
@@ -354,7 +353,8 @@ export const handleMenuNavigation = (state, direction, menuOptions) => {
 	return { ...state, selectedOption: newOptionIndex };
 };
 
-export const handleSelectPiece = (state, cursorPosition) => {
+export const handleSelectPiece = (state) => {
+	const cursorPosition = getHoveredSquare(state.board);
 	const piece = getPieceAt(state.board, cursorPosition);
 
 	if (!piece || piece.color !== state.currentPlayer) {
@@ -390,7 +390,9 @@ export const handleSelectPiece = (state, cursorPosition) => {
 	};
 };
 
-export const handleMovePiece = (state, targetPosition) => {
+export const handleMovePiece = (state, touchingRule) => {
+	const targetPosition = getHoveredSquare(state.board);
+
 	// Check if clicking on the same square (deselect)
 	const isSameSquare =
 		state.selectedSquare.row === targetPosition.row &&
@@ -398,7 +400,11 @@ export const handleMovePiece = (state, targetPosition) => {
 
 	if (isSameSquare) {
 		// Clicking on selected piece deselects it
-		return handleCancelMove(state);
+		// Only when touching rule is disabled
+		if (!touchingRule) {
+			return handleCancelMove(state);
+		}
+		return state;
 	}
 
 	const isValidMove = state.possibleMoves.some(
@@ -408,13 +414,19 @@ export const handleMovePiece = (state, targetPosition) => {
 
 	if (!isValidMove) {
 		// Clicked on invalid square - show illegal move alert
+		
+		// Maintain state with touching rule
+		const previousPhase = touchingRule ? GAME_PHASE.PIECE_SELECTED : GAME_PHASE.WAITING_FOR_PLAYER;
+		const selectedSquare = touchingRule ? state.selectedSquare : null;
+		const possibleMoves = touchingRule ? state.possibleMoves : [];
+		
 		return {
 			...state,
 			phase: GAME_PHASE.ALERT,
-			previousPhase: GAME_PHASE.WAITING_FOR_PLAYER,
+			previousPhase,
 			alert: ALERT.MESSAGE.ILLEGAL_MOVE,
-			selectedSquare: null,
-			possibleMoves: [],
+			selectedSquare,
+			possibleMoves,
 		};
 	}
 

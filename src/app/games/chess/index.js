@@ -41,7 +41,6 @@ import {
 	createButtonAction,
 	createMenuAction,
 	createCursorAction,
-	createPieceSelectAction,
 	createComputerMoveAction,
 	createStockfishAction,
 } from "./state/actions";
@@ -76,6 +75,7 @@ export default function Chess() {
 		mateInMoves: 1,
 		level: 1,
 		teachingMode: false,
+		touchingRule: false,
 		// From setup menu
 		firstMove: "white",
 	});
@@ -234,18 +234,17 @@ export default function Chess() {
 					return handleMenuGameAction(e);
 				}
 
-				// Handle board actions
-				const hoveredSquare = getHoveredSquare(state.board);
-
-				dispatch(createPieceSelectAction(hoveredSquare));
+				dispatch(createButtonAction(Actions.A_BUTTON, {
+					touchingRule: gameSettings.touchingRule
+				}))
 			}
 
 			// B button
 			if (buttonId === "b") {
-				dispatch(createButtonAction(Actions.B_BUTTON));
+				dispatch(createButtonAction(Actions.B_BUTTON, { touchingRule: gameSettings.touchingRule}));
 			}
 		},
-		[state.board, state.phase, handleMenuGameAction]
+		[state.board, state.phase, handleMenuGameAction, gameSettings.touchingRule]
 	);
 
 	const handleGameSelect = useCallback(() => {

@@ -69,16 +69,6 @@ export const createCursorAction = (newPosition) => {
 };
 
 /**
- * Create a piece selection action
- */
-export const createPieceSelectAction = (cursorPosition) => {
-	return {
-		type: Actions.A_BUTTON,
-		payload: { cursorPosition },
-	};
-};
-
-/**
  * Create a computer move action
  */
 export const createComputerMoveAction = (uci) => {
