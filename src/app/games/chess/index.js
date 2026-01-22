@@ -14,7 +14,8 @@ import {
 	ANIMATION_SPEED,
 	ACTION_MENU_OPTIONS,
 	SETTINGS_MENU_OPTIONS,
-	SETUP_MENU_OPTIONS
+	SETUP_MENU_OPTIONS,
+	DEFAULT_GAME_SETTINGS
 } from "./constants";
 import {
 	createStaticChessGrid,
@@ -66,21 +67,7 @@ export default function Chess() {
 	const [state, dispatch] = useReducer(gameReducer, createInitialState());
 
 	const [moveHelp, setMoveHelp] = useState([]); // [best, hint] moves
-	const [gameSettings, setGameSettings] = useState({
-		// From actions menu
-		humanPlayers: 2,
-		// From settings menu
-		mateInMoves: 1,
-		level: 1,
-		teachingMode: false,
-		coordinates: true,
-		touchingRule: false,
-		whiteVisible: true,
-		blackVisible: true,
-		whitePosition: "bottom",
-		// From setup menu
-		firstMove: "white",
-	});
+	const [gameSettings, setGameSettings] = useState(DEFAULT_GAME_SETTINGS);
 	const animatingPieceRef = useRef(null);
 	const animationRef = useRef({ running: false });
 	const prevSelectedOptionRef = useRef(state.selectedOption);
@@ -117,6 +104,24 @@ export default function Chess() {
 		return next;
 	}, [state.board, state.selectedSquare, state.possibleMoves, gameSettings]);
 
+	const loadSettingsFromStorage = useCallback(() => {
+		try {
+			const savedSettings = localStorage.getItem("chess_settings");
+			if (!savedSettings) return null; // First-time user
+
+			const parsed = JSON.parse(savedSettings);
+			if (!parsed || typeof parsed !== "object") {
+				console.warn("Invalid chess settings, using defaults");
+				return null;
+			}
+
+			return parsed;
+		} catch (error) {
+			console.error("Failed to load chess settings:", error);
+			return null; // Fall back to defaults
+		}
+	}, []);
+
 	const loadGame = useCallback(async () => {
 		dispatch({ type: Actions.INITIALIZATION_COMPLETE });
 		setGrid(() =>
@@ -124,6 +129,14 @@ export default function Chess() {
 				row.map((c) => new Cell({ color: c }))
 			)
 		);
+
+		// Load settings from localSotrage
+		const savedSettings = loadSettingsFromStorage();
+		if (savedSettings) {
+			setGameSettings({ ...DEFAULT_GAME_SETTINGS, ...savedSettings})
+		}
+		// If null, defaults from useState remain unchanged
+
 		// Initialize new game with desired difficulty
 		newGame(0); // 0 = weakest, 20 = strongest
 		await delay(1000);
@@ -200,6 +213,19 @@ export default function Chess() {
 					const nextIndex = (currentIndex + 1) % option.values.length;
 					const nextValue = option.values[nextIndex];
 
+					const nextSettings = {
+						...prev,
+						[option.key]: nextValue
+					}
+
+					// Save to localStorage
+					try {
+						localStorage.setItem("chess_settings", JSON.stringify(nextSettings));
+					} catch (error) {
+						console.error("Failed to save chess settings:", error);
+						// Continue without blocking = settings still update in memory
+					}
+
 					// If this is firstMove in setup menu, also update currentPlayer in state
 					if (state.phase === GAME_PHASE.SETUP_MENU && option.key === "firstMove") {
 						dispatch({
@@ -208,10 +234,7 @@ export default function Chess() {
 						});
 					}
 
-					return {
-						...prev,
-						[option.key]: nextValue,
-					};
+					return nextSettings
 				});
 				return;
 			}

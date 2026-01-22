@@ -331,3 +331,19 @@ export const BASIC_BOARD = [
 	[null, null, null, null, null, null, null, null],
 	[null, null, null, null, new King(Color.White), null, null, null],
 ];
+
+export const DEFAULT_GAME_SETTINGS = {
+	// From actions menu
+	humanPlayers: 2,
+	// From settings menu
+	mateInMoves: 1,
+	level: 1,
+	teachingMode: false,
+	coordinates: true,
+	touchingRule: false,
+	whiteVisible: true,
+	blackVisible: true,
+	whitePosition: "bottom",
+	// From setup menu
+	firstMove: "white",
+}
