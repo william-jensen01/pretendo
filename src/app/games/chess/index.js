@@ -470,24 +470,27 @@ export default function Chess() {
 			return;
 		}
 
-		const buildAnimatedGrid = () => {
-			const next = createStaticChessGrid(gameSettings.coordinates, gameSettings.whitePosition);
-			const animating = animatingPieceRef.current;
+		const baseGrid = createStaticChessGrid(gameSettings.coordinates, gameSettings.whitePosition);
+		renderBoardPieces(state.board, baseGrid, null, null, {
+			piece, sourcePos: { row: finalFrom.row, col: finalFrom.col}
+		}, gameSettings);
 
-			renderBoardPieces(state.board, next, null, null, animating, gameSettings);
+		if (gameSettings.chessClock) {
+			renderClock(baseGrid, state.whiteTimeSeconds, state.blackTimeSeconds)
+		}
+
+		const buildAnimatedGrid = () => {
+			// Shallow copy the base grid
+			const next = baseGrid.map(row => [...row]);
+			const animating = animatingPieceRef.current;
 
 			if (animating) {
 				const pieceArr = presets.getPiece(animating.piece.FENChar);
 				if (pieceArr) {
 					renderPieceAt(next, pieceArr, {
-						row: Math.round(animating.currentPos.row),
-						col: Math.round(animating.currentPos.col),
-					});
+						row: Math.round(animating.currentPos.row), col: Math.round(animating.currentPos.col)
+					})
 				}
-			}
-
-			if (gameSettings.chessClock) {
-				renderClock(next, state.whiteTimeSeconds, state.blackTimeSeconds)
 			}
 
 			return next;
