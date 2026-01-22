@@ -39,6 +39,8 @@ export const Actions = {
 	SETUP_FIRST_MOVE: "firstMove",
 	SETUP_COMPLETE: "setupComplete",
 	SETUP_ABANDON_CHANGES: "abandonChanges",
+
+	CLOCK_TICK: "CLOCK_TICK",
 };
 
 /**

@@ -649,6 +649,8 @@ const handleSetupMenuAction = (state, payload) => {
 				currentPlayer: state.pendingFirstMove,
 				firstMove: state.pendingFirstMove,
 				pendingFirstMove: null,
+				whiteTimeSeconds: 0,
+				blackTimeSeconds: 0,
 			}
 		case Actions.SETUP_ABANDON_CHANGES:
 			return {
@@ -737,6 +739,8 @@ const handleSaveGame = (state) => {
 			moves: state.moveHistory.map((m) => m.notation), // All moves from start
 			computerColor: state.computerColor,
 			firstMove: state.firstMove, // Color of first move (for custom setups)
+			whiteTimeSeconds: state.whiteTimeSeconds,
+			blackTimeSeconds: state.blackTimeSeconds,
 		};
 
 		// Save to localStorage
@@ -788,6 +792,8 @@ const handleLoadGame = (state) => {
 			computerColor: saveData.computerColor,
 			firstMove: saveData.firstMove || Color.White, // Restore firstMove or default to White
 			redoMoveStack: [],
+			whiteTimeSeconds: saveData.whiteTimeSeconds || 0,
+			blackTimeSeconds: saveData.blackTimeSeconds || 0,
 		};
 	} catch (error) {
 		console.error("Failed to load game:", error);

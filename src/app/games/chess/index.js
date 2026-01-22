@@ -25,6 +25,7 @@ import {
 	renderMenuScreen,
 	renderAlertScreen,
 	renderSetupScreen,
+	renderClock,
 } from "./util";
 import * as presets from "./presets";
 import { useGameBoyStore } from "@/app/store/gameboy";
@@ -101,8 +102,11 @@ export default function Chess() {
 			null,
 			gameSettings,
 		);
+		if (gameSettings.chessClock) {
+			renderClock(next, state.whiteTimeSeconds, state.blackTimeSeconds);
+		}
 		return next;
-	}, [state.board, state.selectedSquare, state.possibleMoves, gameSettings]);
+	}, [state.board, state.selectedSquare, state.possibleMoves, state.whiteTimeSeconds, state.blackTimeSeconds, gameSettings]);
 
 	const loadSettingsFromStorage = useCallback(() => {
 		try {
@@ -482,6 +486,10 @@ export default function Chess() {
 				}
 			}
 
+			if (gameSettings.chessClock) {
+				renderClock(next, state.whiteTimeSeconds, state.blackTimeSeconds)
+			}
+
 			return next;
 		};
 
@@ -562,6 +570,8 @@ export default function Chess() {
 		state.board,
 		state.currentPlayer,
 		state.computerColor,
+		state.whiteTimeSeconds,
+		state.blackTimeSeconds,
 		setGrid,
 		gameSettings,
 	]);
@@ -640,6 +650,17 @@ export default function Chess() {
 		state.computerColor,
 		setCursor,
 	]);
+
+	// Clock - dispatches CLOCK_TICK every second when timer is running
+	useEffect(() => {
+		if (!isGameReady || !state.clockRunning) return;
+
+		const interval = setInterval(() => {
+			dispatch({ type: Actions.CLOCK_TICK });
+		}, 1000)
+
+		return () => clearInterval(interval);
+	}, [isGameReady, state.clockRunning, dispatch])
 
 	useEffect(() => {
 		setGameState({

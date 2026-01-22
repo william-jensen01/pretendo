@@ -62,6 +62,11 @@ export const initialState = {
 	selectedSetupPiece: null, // Piece being carried during setup
 	firstMove: Color.White, // Color of first move turn
 	pendingFirstMove: null, // Pending value that will be set when setup completes
+
+	// Timer
+	whiteTimeSeconds: 0,
+	blackTimeSeconds: 0,
+	clockRunning: false,
 };
 
 // ============================================================================
@@ -166,6 +171,23 @@ function transition(state, action, payload = {}) {
 		nextState.currentPlayer === nextState.computerColor
 	) {
 		return handleComputerMove(nextState, nextState.pendingComputerMove);
+	}
+
+	// UNIVERSAL TIMER MANAGEMENT
+	// Automatically manage timer based on phase and player
+	const shouldTimerRun = nextState.phase === GAME_PHASE.WAITING_FOR_PLAYER || nextState.phase === GAME_PHASE.PIECE_SELECTED
+
+	if (nextState.clockRunning !== shouldTimerRun) {
+		nextState = {...nextState, clockRunning: shouldTimerRun}
+	}
+
+	// Only increment if timer is actually running (guards against race conditions)
+	if (action === Actions.CLOCK_TICK && nextState.clockRunning) {
+		const timeKey = nextState.currentPlayer === Color.White ? 'whiteTimeSeconds' : 'blackTimeSeconds';
+		nextState = {
+			...nextState,
+			[timeKey]: nextState[timeKey] + 1
+		}
 	}
 
 	// FAILSAFE: Ensure alert is handled by overriding phase to ALERT

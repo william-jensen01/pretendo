@@ -813,3 +813,31 @@ export const renderSetupScreen = (board, gameSettings) => {
 
 	return grid;
 };
+
+/**
+ * Format seconds into HH:MM:SS string
+ * @param {number} totalSeconds - Total elapsed seconds
+ * @returns {string} - Formatted time string (e.g., "00:01:43")
+ */
+export const formatChessTime = (totalSeconds) => {
+	const hours = Math.floor(totalSeconds / 3600);
+	const minutes = Math.floor((totalSeconds % 3600) / 60);
+	const seconds = Math.floor(totalSeconds % 60);
+
+	return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+export const renderClock = (grid, whiteSeconds, blackSeconds) => {
+	const loopText = (text, gRow, gCol) => {
+		text.split("").forEach((c, idx) => {
+			renderText(c, grid, gRow + (idx * 8), gCol, 2);
+		})
+	}
+	const wText = formatChessTime(whiteSeconds);
+	const bText = formatChessTime(blackSeconds);
+
+	// Render clocks
+	// Positions are static: black on top, white on bottom
+	loopText(bText, 0, columns - 8);
+	loopText(wText, rows - wText.length * 8, columns - 8);
+}

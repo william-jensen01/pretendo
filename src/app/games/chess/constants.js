@@ -198,7 +198,7 @@ export const SETTINGS_MENU_OPTIONS = [
 		display: "Chess Clock .",
 		values: [true, false],
 		labels: ["On", "Off"],
-		disabled: true,
+		disabled: false,
 	},
 	{
 		key: "touchingRule",
