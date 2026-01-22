@@ -226,7 +226,7 @@ export const SETTINGS_MENU_OPTIONS = [
 		display: "White On .",
 		values: ["bottom", "left", "top", "right"],
 		labels: ["Bottom", "Left", "Top", "Right"],
-		disabled: true,
+		disabled: false,
 	},
 ];
 

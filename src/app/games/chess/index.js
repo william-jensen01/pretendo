@@ -8,11 +8,9 @@ import {
 } from "react";
 import {
 	BOARD_OFFSET,
-	DEFAULT_BOARD,
 	SQUARE_SIZE,
 	NUM_FILES,
 	NUM_RANKS,
-	HORIZONTAL_AXIS,
 	ANIMATION_SPEED,
 	ACTION_MENU_OPTIONS,
 	SETTINGS_MENU_OPTIONS,
@@ -21,7 +19,6 @@ import {
 import {
 	createStaticChessGrid,
 	renderBoardPieces,
-	getHoveredSquare,
 	renderPieceAt,
 	renderDataScreen,
 	renderMenuScreen,
@@ -46,6 +43,7 @@ import {
 } from "./state/actions";
 import { GAME_PHASE } from "./state/states";
 import { useGameSound } from "./useGameSound";
+import { transformBoardToGrid } from "./transformations";
 
 const initialCursor = {
 	row: Math.floor(
@@ -63,7 +61,7 @@ export default function Chess() {
 	const setGrid = useGameBoyStore((state) => state.setGrid);
 	const setCursor = useGameBoyStore((state) => state.setCursor);
 
-	const staticGridRef = useRef(createStaticChessGrid());
+	const staticGridRef = useRef(createStaticChessGrid(true, "bottom"));
 
 	const [state, dispatch] = useReducer(gameReducer, createInitialState());
 
@@ -79,6 +77,7 @@ export default function Chess() {
 		touchingRule: false,
 		whiteVisible: true,
 		blackVisible: true,
+		whitePosition: "bottom",
 		// From setup menu
 		firstMove: "white",
 	});
@@ -106,7 +105,7 @@ export default function Chess() {
 
 	// Compute grid based on board and state
 	const boardGrid = useMemo(() => {
-		const next = createStaticChessGrid(gameSettings.coordinates);
+		const next = createStaticChessGrid(gameSettings.coordinates, gameSettings.whitePosition);
 		renderBoardPieces(
 			state.board,
 			next,
@@ -240,7 +239,8 @@ export default function Chess() {
 				}
 
 				dispatch(createButtonAction(Actions.A_BUTTON, {
-					touchingRule: gameSettings.touchingRule
+					touchingRule: gameSettings.touchingRule,
+					whitePosition: gameSettings.whitePosition,
 				}))
 			}
 
@@ -444,7 +444,7 @@ export default function Chess() {
 		}
 
 		const buildAnimatedGrid = () => {
-			const next = createStaticChessGrid(gameSettings.coordinates);
+			const next = createStaticChessGrid(gameSettings.coordinates, gameSettings.whitePosition);
 			const animating = animatingPieceRef.current;
 
 			renderBoardPieces(state.board, next, null, null, animating, gameSettings);
@@ -469,10 +469,8 @@ export default function Chess() {
 				return;
 			}
 
-			const fromGRow = from.row * SQUARE_SIZE + BOARD_OFFSET;
-			const fromGCol = from.col * SQUARE_SIZE + BOARD_OFFSET;
-			const toGRow = to.row * SQUARE_SIZE + BOARD_OFFSET;
-			const toGCol = to.col * SQUARE_SIZE + BOARD_OFFSET;
+			const { row: fromGRow, col: fromGCol } = transformBoardToGrid(from.row, from.col, gameSettings.whitePosition);
+			const { row: toGRow, col: toGCol } = transformBoardToGrid(to.row, to.col, gameSettings.whitePosition);
 
 			const dx = toGCol - fromGCol;
 			const dy = toGRow - fromGRow;

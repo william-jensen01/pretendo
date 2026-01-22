@@ -17,10 +17,10 @@ import {
 import * as presets from "./presets";
 import { useGameBoyStore } from "@/app/store/gameboy";
 import { Color } from "./logic/models";
-import { Pawn } from "./logic/pieces";
 import { GAME_PHASE } from "./state/states";
+import { getCoordinateLabels, transformBoardToGrid } from "./transformations";
 
-export const createStaticChessGrid = (showCoords = true) => {
+export const createStaticChessGrid = (showCoords = true, whitePosition = "bottom") => {
 	const grid = create2dArray();
 
 	// 1. BORDER
@@ -61,15 +61,17 @@ export const createStaticChessGrid = (showCoords = true) => {
 	};
 
 	if (showCoords) {
-		renderCoords(HORIZONTAL_AXIS, true);
-		renderCoords(VERTICAL_AXIS, false);
+		// Adjust coordinate labels based on rotation
+		const [horizontalLabels, verticalLabels] = getCoordinateLabels(whitePosition);
+
+		renderCoords(horizontalLabels, true);
+		renderCoords(verticalLabels, false);
 	}
 
 	// 3. BOARD SQUARE COLORS
 	for (let r = 0; r < 8; r++) {
 		for (let c = 0; c < 8; c++) {
-			const gRow = r * SQUARE_SIZE + BOARD_OFFSET;
-			const gCol = c * SQUARE_SIZE + BOARD_OFFSET;
+			const { row: gRow, col: gCol } = transformBoardToGrid(r, c, whitePosition);
 			const color = (r + c) % 2 === 0 ? 0 : 3;
 
 			for (let sr = 0; sr < SQUARE_SIZE; sr++) {
@@ -148,8 +150,11 @@ export const renderBoardPieces = (
 				return;
 			}
 
-			const gCol = fileIdx * SQUARE_SIZE + BOARD_OFFSET;
-			const gRow = rankIdx * SQUARE_SIZE + BOARD_OFFSET;
+			const { row: gRow, col: gCol } = transformBoardToGrid(
+				rankIdx,
+				fileIdx,
+				gameSettings.whitePosition
+			);
 
 			if (
 				selectedSquare &&
@@ -173,8 +178,11 @@ export const renderBoardPieces = (
 
 	if (gameSettings?.teachingMode && possibleMoves && possibleMoves.length > 0) {
 		possibleMoves.forEach(({ row, col }) => {
-			const gCol = col * SQUARE_SIZE + BOARD_OFFSET;
-			const gRow = row * SQUARE_SIZE + BOARD_OFFSET;
+			const { row: gRow, col: gCol } = transformBoardToGrid(
+				row,
+				col,
+				gameSettings.whitePosition || "bottom"
+			);
 			renderSquareHighlight(staticGrid, gRow, gCol, "possible");
 		});
 	}
@@ -199,7 +207,7 @@ export const deepCopyBoard = (board) => {
 	);
 };
 
-export const getHoveredSquare = (board) => {
+export const getHoveredSquare = (board, whitePosition = "bottom") => {
 	const cursor = useGameBoyStore.getState().cursor;
 	const cursorRowStart = cursor.row;
 	const cursorRowEnd = cursor.row + cursor.cells.length;
@@ -210,9 +218,12 @@ export const getHoveredSquare = (board) => {
 	let bestArea = 0;
 	board.forEach((rankRow, rIdx) => {
 		rankRow.forEach((piece, fIdx) => {
-			const sRowStart = rIdx * SQUARE_SIZE + BOARD_OFFSET;
+			const { row: sRowStart, col: sColStart } = transformBoardToGrid(
+				rIdx,
+				fIdx,
+				whitePosition
+			);
 			const sRowEnd = sRowStart + SQUARE_SIZE;
-			const sColStart = fIdx * SQUARE_SIZE + BOARD_OFFSET;
 			const sColEnd = sColStart + SQUARE_SIZE;
 
 			// compute overlap rectangle
@@ -637,8 +648,9 @@ export const renderMenuScreen = (
 
 export const renderAlertScreen = (alertText, board, gameSettings) => {
 	// Create a chess grid with no coordinates
-	const grid = createStaticChessGrid(false);
-	renderBoardPieces(board, grid, null, null, null, false, gameSettings);
+	const grid = createStaticChessGrid(false, gameSettings.whitePosition);
+
+	renderBoardPieces(board, grid, null, null, false, gameSettings);
 
 	// Constants
 	const {

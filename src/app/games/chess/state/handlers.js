@@ -52,7 +52,7 @@ export const handleWaitingForPlayerPhase = (state, action, payload) => {
 	switch (action) {
 		case Actions.A_BUTTON:
 			// Select piece at cursor position
-			return handleSelectPiece(state);
+			return handleSelectPiece(state, payload);
 
 		case Actions.B_BUTTON:
 			// Takeback/replay
@@ -87,7 +87,7 @@ export const handlePieceSelectedPhase = (state, action, payload) => {
 	switch (action) {
 		case Actions.A_BUTTON:
 			// Attempt to move piece to cursor position
-			return handleMovePiece(state, payload.touchingRule);
+			return handleMovePiece(state, payload);
 		case Actions.B_BUTTON:
 			// Cancel move when touching rule is disabled
 			if (!payload.touchingRule) {
@@ -353,8 +353,8 @@ export const handleMenuNavigation = (state, direction, menuOptions) => {
 	return { ...state, selectedOption: newOptionIndex };
 };
 
-export const handleSelectPiece = (state) => {
-	const cursorPosition = getHoveredSquare(state.board);
+export const handleSelectPiece = (state, payload) => {
+	const cursorPosition = getHoveredSquare(state.board, payload.whitePosition);
 	const piece = getPieceAt(state.board, cursorPosition);
 
 	if (!piece || piece.color !== state.currentPlayer) {
@@ -390,8 +390,10 @@ export const handleSelectPiece = (state) => {
 	};
 };
 
-export const handleMovePiece = (state, touchingRule) => {
-	const targetPosition = getHoveredSquare(state.board);
+export const handleMovePiece = (state, payload) => {
+	const { touchingRule, whitePosition } = payload;
+
+	const targetPosition = getHoveredSquare(state.board, whitePosition);
 
 	// Check if clicking on the same square (deselect)
 	const isSameSquare =
