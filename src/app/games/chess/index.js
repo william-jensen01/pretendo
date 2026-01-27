@@ -89,7 +89,7 @@ export default function Chess() {
 	const { isReady, getBestMove, newGame, getHint, offerDraw, forceMove } =
 		useStockfish(1, startingFEN);
 
-	const soundPlayingRef = useGameSound({state, delayStockfishRef, prevSelectedOptionRef})
+	const soundPlayingRef = useGameSound({ state, delayStockfishRef, prevSelectedOptionRef })
 
 	// Compute grid based on board and state
 	const boardGrid = useMemo(() => {
@@ -137,7 +137,7 @@ export default function Chess() {
 		// Load settings from localSotrage
 		const savedSettings = loadSettingsFromStorage();
 		if (savedSettings) {
-			setGameSettings({ ...DEFAULT_GAME_SETTINGS, ...savedSettings})
+			setGameSettings({ ...DEFAULT_GAME_SETTINGS, ...savedSettings })
 		}
 		// If null, defaults from useState remain unchanged
 
@@ -273,7 +273,7 @@ export default function Chess() {
 
 			// B button
 			if (buttonId === "b") {
-				dispatch(createButtonAction(Actions.B_BUTTON, { touchingRule: gameSettings.touchingRule}));
+				dispatch(createButtonAction(Actions.B_BUTTON, { touchingRule: gameSettings.touchingRule }));
 			}
 		},
 		[state.board, state.phase, handleMenuGameAction, gameSettings.touchingRule]
@@ -472,7 +472,7 @@ export default function Chess() {
 
 		const baseGrid = createStaticChessGrid(gameSettings.coordinates, gameSettings.whitePosition);
 		renderBoardPieces(state.board, baseGrid, null, null, {
-			piece, sourcePos: { row: finalFrom.row, col: finalFrom.col}
+			piece, sourcePos: { row: finalFrom.row, col: finalFrom.col }
 		}, gameSettings);
 
 		if (gameSettings.chessClock) {
@@ -589,11 +589,11 @@ export default function Chess() {
 		switch (state.phase) {
 			case GAME_PHASE.WAITING_FOR_PLAYER:
 				if (state.computerColor === state.currentPlayer) {
-					cells = presets.thinking;
+					cells = presets.getCursor("?");
 				}
 				break;
 			case GAME_PHASE.WAITING_FOR_STOCKFISH:
-				cells = presets.thinking;
+				cells = presets.getCursor("?");
 				break;
 			case GAME_PHASE.DATA_SCREEN:
 				display = false;
@@ -610,16 +610,15 @@ export default function Chess() {
 			case GAME_PHASE.SETUP_BOARD:
 				display = true;
 				if (state.selectedSetupPiece) {
-					const pieceArr = presets.getPiece(state.selectedSetupPiece.FENChar);
-					cells = pieceArr || presets.cursor;
+					cells = presets.getCursor(state.selectedSetupPiece.FENChar);
 				}
 				break;
 			case GAME_PHASE.REPLAY:
-				cells = presets.takebackReplay;
+				cells = presets.getCursor("replay");
 				break;
 			case GAME_PHASE.ANIMATING:
 				if (state.previousPhase === GAME_PHASE.REPLAY) {
-					cells = presets.takebackReplay;
+					cells = presets.getCursor("replay");
 				}
 				break;
 			case GAME_PHASE.PIECE_SELECTED:
@@ -627,10 +626,9 @@ export default function Chess() {
 				if (state.selectedSquare) {
 					const piece =
 						state.board[state.selectedSquare.row][
-							state.selectedSquare.col
+						state.selectedSquare.col
 						];
-					const pieceArr = presets.getPiece(piece?.FENChar);
-					cells = pieceArr || presets.cursor;
+					cells = presets.getCursor(piece?.FENChar);
 				}
 				break;
 			case GAME_PHASE.ALERT:
@@ -669,13 +667,13 @@ export default function Chess() {
 		setGameState({
 			name: "chess",
 			loadGame,
-			resetGame: () => {},
+			resetGame: () => { },
 			handleGameCursor,
 			handleGameDpad,
 			handleGameAction,
 			handleGameSelect,
 			handleGameStart,
-			handleGameCellClick: () => {},
+			handleGameCellClick: () => { },
 		});
 	}, [
 		setGameState,
