@@ -485,7 +485,7 @@ export default function Chess() {
 			const animating = animatingPieceRef.current;
 
 			if (animating) {
-				const pieceArr = presets.getPiece(animating.piece.FENChar);
+				const pieceArr = presets.getMovePiece(animating.piece.FENChar);
 				if (pieceArr) {
 					renderPieceAt(next, pieceArr, {
 						row: Math.round(animating.currentPos.row), col: Math.round(animating.currentPos.col)

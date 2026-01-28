@@ -1,22 +1,4 @@
-function flattenMatrix(blocks) {
-    const blockRows = blocks.length;
-    const blockCols = blocks[0].length;
-
-    const innerRowCount = blocks[0][0].length;
-    const result = [];
-
-    for (let br = 0; br < blockRows; br++) {
-        for (let r = 0; r < innerRowCount; r++) {
-            const row = [];
-            for (let bc = 0; bc < blockCols; bc++) {
-                row.push(...blocks[br][bc][r]);
-            }
-            result.push(row);
-        }
-    }
-
-    return result;
-}
+import { flattenMatrix } from "../presets";
 
 // MARK: Hand
 // free range cursor

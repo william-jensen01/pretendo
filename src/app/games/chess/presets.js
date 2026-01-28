@@ -1,4 +1,25 @@
 export * from './presets/cursor';
+export * from './presets/moving';
+
+export function flattenMatrix(blocks) {
+	const blockRows = blocks.length;
+	const blockCols = blocks[0].length;
+
+	const innerRowCount = blocks[0][0].length;
+	const result = [];
+
+	for (let br = 0; br < blockRows; br++) {
+		for (let r = 0; r < innerRowCount; r++) {
+			const row = [];
+			for (let bc = 0; bc < blockCols; bc++) {
+				row.push(...blocks[br][bc][r]);
+			}
+			result.push(row);
+		}
+	}
+
+	return result;
+};
 
 export const arrow = [
 	[0, 0, 3, 3, 0, 0, 0, 0],
