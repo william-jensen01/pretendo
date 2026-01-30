@@ -135,6 +135,16 @@ export default function useSound(
 		}
 	}, [sound, stereo]);
 
+	// Cleanup: stop and unload sound on unmount
+	useEffect(() => {
+		return () => {
+			if (sound) {
+				sound.stop();
+				sound.unload();
+			}
+		};
+	}, [sound]);
+
 	const play = useCallback(
 		(options = {}) => {
 			if (!sound || (!soundEnabled && !options.forceSoundEnabled)) {

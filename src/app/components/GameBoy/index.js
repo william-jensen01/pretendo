@@ -279,7 +279,9 @@ export default function GameBoy({ dragging, pageRef }) {
 		if (stopAnimationRef.current) {
 			stopAnimationRef.current();
 		}
-		gameState.resetGame();
+		// Clear pak first to trigger unmount and cleanup of game component
+		setPak(null);
+		setGameState(EmptyPak);
 		resetGameBoy();
 		changePowerStatus(0);
 
