@@ -1,6 +1,7 @@
 import { useRef, useEffect, useCallback, useMemo, memo } from "react";
 import { rows, columns } from "@/app/constants";
 import { useGameBoyStore } from "@/app/store/gameboy";
+import { create2dArray } from "@/app/util/helper";
 
 // Internal canvas resolution (for crisp rendering keep whole integers)
 const INTERNAL_CELL_SIZE = 8; // 8x8 pixels per Game Boy pixel
@@ -100,17 +101,20 @@ export default memo(function Screen() {
 		context.fillStyle = "rgba(0,0,0,0.1)";
 		context.fillRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
 
+		// When powered off, render empty grid to maintain gaps (don't use stale grid data)
+		const activeGrid = powerStatus ? grid : create2dArray();
+
 		// Draw cells with gaps between them
 		for (let rowIdx = 0; rowIdx < rows; rowIdx++) {
 			for (let colIdx = 0; colIdx < columns; colIdx++) {
-				const cell = grid[rowIdx]?.[colIdx];
+				const cell = activeGrid[rowIdx]?.[colIdx];
 				if (!cell || cell.color === undefined || cell.color === null)
 					continue;
 
 				drawCell(context, colIdx, rowIdx, cell.color);
 			}
 		}
-	}, [grid, drawCell, configureCanvas]);
+	}, [grid, drawCell, configureCanvas, powerStatus]);
 
 	useEffect(() => {
 		const canvas = cursorCanvasRef.current;
@@ -119,7 +123,8 @@ export default memo(function Screen() {
 		const context = configureCanvas(canvas);
 		if (!context) return;
 
-		if (!cursor?.display) {
+		// Don't render cursor if not displayed or console is powered off
+		if (!cursor?.display || !powerStatus) {
 			startTimeRef.current = null;
 			return context.clearRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
 		}
@@ -157,7 +162,7 @@ export default memo(function Screen() {
 		}
 
 		return () => cancelAnimationFrame(requestIdRef.current);
-	}, [cursor, handleGameCursor, isCursorAnimated, drawCell, configureCanvas]);
+	}, [cursor, handleGameCursor, isCursorAnimated, drawCell, configureCanvas, powerStatus]);
 
 	return (
 		<div

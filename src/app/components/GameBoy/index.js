@@ -230,6 +230,9 @@ export default function GameBoy({ dragging, pageRef }) {
 	};
 
 	async function powerOn() {
+		// Clear grid before powering on to prevent rendering stale data
+		setGrid(create2dArray());
+
 		changePowerStatus(1);
 
 		// Not setting "running" state as this will result in "START" to display "STOP"
@@ -570,8 +573,8 @@ export default function GameBoy({ dragging, pageRef }) {
 							boxShadow: isOver
 								? "inset 0 0 0 5px #201d4b"
 								: dragging
-								? "inset 0 0 0 2.5px #e5e9ed"
-								: "inset 0 0 0 5px transparent",
+									? "inset 0 0 0 2.5px #e5e9ed"
+									: "inset 0 0 0 5px transparent",
 						}}
 					>
 						Insert Game Pak
@@ -627,9 +630,8 @@ export default function GameBoy({ dragging, pageRef }) {
 						</span>
 					</div>
 					<div
-						className={`battery-light ${
-							powerStatus ? "powered" : "discharged"
-						}`}
+						className={`battery-light ${powerStatus ? "powered" : "discharged"
+							}`}
 					>
 						<span className={Futura.className}>BATTERY</span>
 					</div>
