@@ -33,7 +33,7 @@ import useSound from "@/app/util/useSound";
 // 	snake: Snake,
 // };
 
-const games = ["life", "snake"];
+const games = ["life", "snake", "chess"];
 
 export default function Home() {
 	const message = useGameBoyStore((state) => state.message);

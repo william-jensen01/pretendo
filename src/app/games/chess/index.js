@@ -1,0 +1,687 @@
+import {
+	useState,
+	useCallback,
+	useEffect,
+	useRef,
+	useMemo,
+	useReducer,
+} from "react";
+import {
+	BOARD_OFFSET,
+	SQUARE_SIZE,
+	NUM_FILES,
+	NUM_RANKS,
+	ANIMATION_SPEED,
+	ACTION_MENU_OPTIONS,
+	SETTINGS_MENU_OPTIONS,
+	SETUP_MENU_OPTIONS,
+	DEFAULT_GAME_SETTINGS
+} from "./constants";
+import {
+	createStaticChessGrid,
+	renderBoardPieces,
+	renderPieceAt,
+	renderDataScreen,
+	renderMenuScreen,
+	renderAlertScreen,
+	renderSetupScreen,
+	renderClock,
+} from "./util";
+import * as presets from "./presets";
+import { useGameBoyStore } from "@/app/store/gameboy";
+import { rows, columns } from "@/app/constants";
+import Cell from "@/app/Cell";
+import { delay, continuouslyAnimate } from "@/app/util/helper";
+import { useStockfish } from "./logic/useStockfish";
+import { historyToUCI, boardToFEN } from "./logic/FENConverter";
+import { gameReducer, createInitialState } from "./state/reducer";
+import {
+	Actions,
+	createButtonAction,
+	createMenuAction,
+	createCursorAction,
+	createComputerMoveAction,
+	createStockfishAction,
+} from "./state/actions";
+import { GAME_PHASE } from "./state/states";
+import { useGameSound } from "./useGameSound";
+import { transformBoardToGrid } from "./transformations";
+
+const initialCursor = {
+	row: Math.floor(
+		BOARD_OFFSET + (NUM_RANKS * SQUARE_SIZE) / 2 - presets.cursor.length / 2
+	),
+	col: Math.floor(
+		BOARD_OFFSET + (NUM_FILES * SQUARE_SIZE) / 2 - presets.cursor.length / 2
+	),
+	cells: presets.cursor,
+	display: false,
+};
+
+export default function Chess() {
+	const setGameState = useGameBoyStore((state) => state.setGameState);
+	const setGrid = useGameBoyStore((state) => state.setGrid);
+	const setCursor = useGameBoyStore((state) => state.setCursor);
+
+	const staticGridRef = useRef(createStaticChessGrid(true, "bottom"));
+
+	const [state, dispatch] = useReducer(gameReducer, createInitialState());
+
+	const [moveHelp, setMoveHelp] = useState([]); // [best, hint] moves
+	const [gameSettings, setGameSettings] = useState(DEFAULT_GAME_SETTINGS);
+	const animatingPieceRef = useRef(null);
+	const animationRef = useRef({ running: false });
+	const prevSelectedOptionRef = useRef(state.selectedOption);
+	const delayStockfishRef = useRef(0);
+
+	const isGameReady = useMemo(
+		() =>
+			state.phase !== GAME_PHASE.INITIALIZING &&
+			state.phase !== GAME_PHASE.WELCOMING,
+		[state.phase]
+	);
+
+	// Calculate starting FEN from startingBoard for Stockfish
+	const startingFEN = useMemo(() => {
+		return boardToFEN(state.startingBoard, state.firstMove, null);
+	}, [state.startingBoard, state.firstMove]);
+
+	const { isReady, getBestMove, newGame, getHint, offerDraw, forceMove } =
+		useStockfish(1, startingFEN);
+
+	const soundPlayingRef = useGameSound({ state, delayStockfishRef, prevSelectedOptionRef })
+
+	// Compute grid based on board and state
+	const boardGrid = useMemo(() => {
+		const next = createStaticChessGrid(gameSettings.coordinates, gameSettings.whitePosition);
+		renderBoardPieces(
+			state.board,
+			next,
+			state.selectedSquare,
+			state.possibleMoves,
+			null,
+			gameSettings,
+		);
+		if (gameSettings.chessClock) {
+			renderClock(next, state.whiteTimeSeconds, state.blackTimeSeconds);
+		}
+		return next;
+	}, [state.board, state.selectedSquare, state.possibleMoves, state.whiteTimeSeconds, state.blackTimeSeconds, gameSettings]);
+
+	const loadSettingsFromStorage = useCallback(() => {
+		try {
+			const savedSettings = localStorage.getItem("chess_settings");
+			if (!savedSettings) return null; // First-time user
+
+			const parsed = JSON.parse(savedSettings);
+			if (!parsed || typeof parsed !== "object") {
+				console.warn("Invalid chess settings, using defaults");
+				return null;
+			}
+
+			return parsed;
+		} catch (error) {
+			console.error("Failed to load chess settings:", error);
+			return null; // Fall back to defaults
+		}
+	}, []);
+
+	const loadGame = useCallback(async () => {
+		dispatch({ type: Actions.INITIALIZATION_COMPLETE });
+		setGrid(() =>
+			presets.titleScreen.map((row) =>
+				row.map((c) => new Cell({ color: c }))
+			)
+		);
+
+		// Load settings from localSotrage
+		const savedSettings = loadSettingsFromStorage();
+		if (savedSettings) {
+			setGameSettings({ ...DEFAULT_GAME_SETTINGS, ...savedSettings })
+		}
+		// If null, defaults from useState remain unchanged
+
+		// Initialize new game with desired difficulty
+		newGame(0); // 0 = weakest, 20 = strongest
+		await delay(1000);
+		await delay(1500);
+		dispatch({ type: Actions.TITLE_SCREEN_COMPLETE });
+		setCursor((prev) => ({ ...prev, display: true }));
+	}, [setCursor, setGrid, newGame]);
+
+	const handleGameCursor = useCallback(
+		({ context, cursor, drawCell, rows, columns }) => {
+			cursor?.cells?.forEach((row, rowIdx) => {
+				row.forEach((cell, colIdx) => {
+					if (!cell) return;
+					const gRow = (cursor.row + rowIdx) % rows;
+					const gCol = (cursor.col + colIdx) % columns;
+
+					drawCell(context, gCol, gRow, cell - 1);
+				});
+			});
+		},
+		[]
+	);
+
+	const handleGameDpad = useCallback(
+		(r, c) => {
+			// Move visual cursor
+			setCursor((prev) => {
+				// restrict movement to within screen grid (prevent out of bounds)
+				const nRow = Math.max(
+					0,
+					Math.min(prev.row + r, rows - prev.cells.length)
+				);
+				const nCol = Math.max(
+					0,
+					Math.min(prev.col + c, columns - prev.cells[0].length)
+				);
+
+				return {
+					...prev,
+					row: nRow,
+					col: nCol,
+				};
+			});
+
+			if (soundPlayingRef.current) return; // Block during sound
+			dispatch(createCursorAction({ r, c }));
+		},
+		[setCursor]
+	);
+
+	const handleMenuGameAction = useCallback(
+		(e) => {
+			// Handle menu option selection (both ACTIONS and SETTINGS)
+			if (
+				state.phase !== GAME_PHASE.MENU_ACTIONS &&
+				state.phase !== GAME_PHASE.MENU_SETTINGS && state.phase !== GAME_PHASE.SETUP_MENU
+			)
+				return;
+
+			const menuOptions =
+				state.phase === GAME_PHASE.MENU_ACTIONS
+					? ACTION_MENU_OPTIONS
+					: state.phase === GAME_PHASE.MENU_SETTINGS ? SETTINGS_MENU_OPTIONS : state.phase === GAME_PHASE.SETUP_MENU ? SETUP_MENU_OPTIONS : null;
+
+			const option = menuOptions[state.selectedOption];
+			if (!option || option?.disabled) return;
+
+			// If option has values, it's a setting - cycle the value
+			if (option.hasOwnProperty("values") && option.values) {
+				setGameSettings((prev) => {
+					const currentIndex = option.values.indexOf(
+						prev[option.key]
+					);
+					const nextIndex = (currentIndex + 1) % option.values.length;
+					const nextValue = option.values[nextIndex];
+
+					const nextSettings = {
+						...prev,
+						[option.key]: nextValue
+					}
+
+					// Save to localStorage
+					try {
+						localStorage.setItem("chess_settings", JSON.stringify(nextSettings));
+					} catch (error) {
+						console.error("Failed to save chess settings:", error);
+						// Continue without blocking = settings still update in memory
+					}
+
+					// If this is firstMove in setup menu, also update currentPlayer in state
+					if (state.phase === GAME_PHASE.SETUP_MENU && option.key === "firstMove") {
+						dispatch({
+							type: Actions.A_BUTTON,
+							payload: { selectedAction: option.key, color: nextValue },
+						});
+					}
+
+					return nextSettings
+				});
+				return;
+			}
+
+			// Otherwise, it's an action - dispatch to state machine
+			dispatch(createMenuAction(option.key));
+		},
+		[state.phase, state.selectedOption]
+	);
+
+	const handleGameAction = useCallback(
+		(e) => {
+			if (soundPlayingRef.current) return; // Block during sound
+
+			const buttonId = e.currentTarget.id;
+
+			// A button
+			if (buttonId === "a") {
+				// Handle menu option selection (both ACTIONS and SETTINGS)
+				if (
+					state.phase === GAME_PHASE.MENU_ACTIONS ||
+					state.phase === GAME_PHASE.MENU_SETTINGS || state.phase === GAME_PHASE.SETUP_MENU
+				) {
+					return handleMenuGameAction(e);
+				}
+
+				dispatch(createButtonAction(Actions.A_BUTTON, {
+					touchingRule: gameSettings.touchingRule,
+					whitePosition: gameSettings.whitePosition,
+				}))
+			}
+
+			// B button
+			if (buttonId === "b") {
+				dispatch(createButtonAction(Actions.B_BUTTON, { touchingRule: gameSettings.touchingRule }));
+			}
+		},
+		[state.board, state.phase, handleMenuGameAction, gameSettings.touchingRule]
+	);
+
+	const handleGameSelect = useCallback(() => {
+		if (soundPlayingRef.current) return; // Block during sound
+
+		dispatch(createButtonAction(Actions.SELECT_BUTTON));
+	}, []);
+
+	const handleGameStart = useCallback(() => {
+		if (soundPlayingRef.current) return; // Block during sound
+
+		dispatch(createButtonAction(Actions.START_BUTTON));
+	}, []);
+
+	useEffect(() => {
+		// Set cursor to initial state, will update display status when game is loaded
+		setCursor(() => ({ ...initialCursor }));
+	}, []);
+
+	// Request and execute computer move in one place
+	useEffect(() => {
+		if (
+			!isGameReady ||
+			!isReady ||
+			state.phase !== GAME_PHASE.WAITING_FOR_PLAYER ||
+			state.currentPlayer !== state.computerColor
+		)
+			return;
+
+		const moves = historyToUCI(state.moveHistory);
+
+		// Delay is to ensure the move sound is finished before computer move
+		// Always delay unless coming from REPLAY
+		const needsDelay = state.previousPhase !== GAME_PHASE.REPLAY;
+		const delayMs = needsDelay ? delayStockfishRef.current : 0;
+
+		const timer = setTimeout(() => {
+			getBestMove(moves, (move) => {
+				if (move !== "none" && move !== "(none)") {
+					// get hint with new move
+					getHint(moves + " " + move, (info) => setMoveHelp(info));
+				}
+
+				dispatch(createComputerMoveAction(move));
+			});
+		}, delayMs);
+
+		return () => {
+			clearTimeout(timer);
+		};
+	}, [
+		isGameReady,
+		state.phase,
+		state.previousPhase,
+		state.currentPlayer,
+		state.computerColor,
+		state.moveHistory,
+		isReady,
+		getBestMove,
+		getHint,
+	]);
+
+	// Force computer move
+	useEffect(() => {
+		if (
+			!isGameReady ||
+			state.phase !== GAME_PHASE.WAITING_FOR_STOCKFISH ||
+			state.stockfishOperation?.type !== "force_move" ||
+			!isReady
+		)
+			return;
+
+		forceMove();
+
+		// No need to dispatch action here - it's handled by the initial request computer move callback
+	}, [
+		isGameReady,
+		state.phase,
+		state.stockfishOperation,
+		isReady,
+		forceMove,
+	]);
+
+	// Offer draw evaluation
+	useEffect(() => {
+		if (
+			!isGameReady ||
+			state.phase !== GAME_PHASE.WAITING_FOR_STOCKFISH ||
+			state.stockfishOperation?.type !== "offer_draw" ||
+			!isReady
+		)
+			return;
+
+		const moves = historyToUCI(state.moveHistory);
+
+		offerDraw(moves, (shouldAccept, _) => {
+			dispatch(
+				createStockfishAction(
+					shouldAccept ? Actions.DRAW_ACCEPTED : Actions.DRAW_REJECTED
+				)
+			);
+		});
+	}, [
+		isGameReady,
+		state.phase,
+		state.stockfishOperation,
+		state.moveHistory,
+		isReady,
+		offerDraw,
+	]);
+
+	useEffect(() => {
+		if (!isGameReady) return;
+
+		switch (state.phase) {
+			case GAME_PHASE.DATA_SCREEN:
+				setGrid(renderDataScreen(state.moveHistory, moveHelp, state.capturedPieces));
+				break;
+			case GAME_PHASE.MENU_ACTIONS:
+				setGrid(
+					renderMenuScreen(
+						1,
+						ACTION_MENU_OPTIONS,
+						gameSettings,
+						state.selectedOption
+					)
+				);
+				break;
+			case GAME_PHASE.MENU_SETTINGS:
+				setGrid(
+					renderMenuScreen(
+						2,
+						SETTINGS_MENU_OPTIONS,
+						gameSettings,
+						state.selectedOption
+					)
+				);
+				break;
+			case GAME_PHASE.SETUP_BOARD:
+				setGrid(renderSetupScreen(state.board, gameSettings));
+				break;
+			case GAME_PHASE.SETUP_MENU:
+				setGrid(renderMenuScreen(
+					GAME_PHASE.SETUP_MENU,
+					SETUP_MENU_OPTIONS,
+					gameSettings,
+					state.selectedOption
+				))
+				break;
+			case GAME_PHASE.ALERT:
+				setGrid(renderAlertScreen(state.alert, state.board, gameSettings));
+				break;
+			default:
+				setGrid(boardGrid);
+		}
+	}, [
+		isGameReady,
+		state.phase,
+		state.moveHistory,
+		state.capturedPieces,
+		state.selectedOption,
+		state.board,
+		state.alert,
+		moveHelp,
+		boardGrid,
+		setGrid,
+		gameSettings,
+	]);
+
+	// Animate piece selection when transitioning to ANIMATING
+	useEffect(() => {
+		if (state.phase !== GAME_PHASE.ANIMATING || !state.animatingMove)
+			return;
+
+		const { from, to, isReverse } = state.animatingMove;
+		const finalFrom = isReverse ? to : from;
+		const finalTo = isReverse ? from : to;
+		const piece = state.board[finalFrom.row][finalFrom.col];
+
+		if (!piece) {
+			dispatch({ type: Actions.ANIMATION_COMPLETE });
+			return;
+		}
+
+		// Don't animate player turns unless in replay mode
+		if (
+			state.previousPhase !== GAME_PHASE.REPLAY &&
+			state.currentPlayer !== state.computerColor
+		) {
+			dispatch({ type: Actions.ANIMATION_COMPLETE });
+			return;
+		}
+
+		const baseGrid = createStaticChessGrid(gameSettings.coordinates, gameSettings.whitePosition);
+		renderBoardPieces(state.board, baseGrid, null, null, {
+			piece, sourcePos: { row: finalFrom.row, col: finalFrom.col }
+		}, gameSettings);
+
+		if (gameSettings.chessClock) {
+			renderClock(baseGrid, state.whiteTimeSeconds, state.blackTimeSeconds)
+		}
+
+		const buildAnimatedGrid = () => {
+			// Shallow copy the base grid
+			const next = baseGrid.map(row => [...row]);
+			const animating = animatingPieceRef.current;
+
+			if (animating) {
+				const pieceArr = presets.getMovePiece(animating.piece.FENChar);
+				if (pieceArr) {
+					renderPieceAt(next, pieceArr, {
+						row: Math.round(animating.currentPos.row), col: Math.round(animating.currentPos.col)
+					})
+				}
+			}
+
+			return next;
+		};
+
+		const animatePieceMove = (piece, from, to, onComplete) => {
+			if (from.row === to.row && from.col === to.col) {
+				// No movement needed
+				onComplete();
+				return;
+			}
+
+			const { row: fromGRow, col: fromGCol } = transformBoardToGrid(from.row, from.col, gameSettings.whitePosition);
+			const { row: toGRow, col: toGCol } = transformBoardToGrid(to.row, to.col, gameSettings.whitePosition);
+
+			const dx = toGCol - fromGCol;
+			const dy = toGRow - fromGRow;
+			const distance = Math.sqrt(dx * dx + dy * dy);
+
+			// Normalize to get unit vector, then scale by speed
+			const velocity = {
+				row: (dy / distance) * ANIMATION_SPEED,
+				col: (dx / distance) * ANIMATION_SPEED,
+			};
+
+			animatingPieceRef.current = {
+				piece,
+				sourcePos: { row: from.row, col: from.col },
+				currentPos: { row: fromGRow, col: fromGCol },
+				targetPos: { row: toGRow, col: toGCol },
+				velocity,
+			};
+
+			animationRef.current.running = true;
+
+			const { animate } = continuouslyAnimate(
+				"pieceMove",
+				animationRef,
+				() => {
+					const anim = animatingPieceRef.current;
+					if (!anim) return false;
+
+					anim.currentPos.row += anim.velocity.row;
+					anim.currentPos.col += anim.velocity.col;
+
+					const remainingX = anim.targetPos.col - anim.currentPos.col;
+					const remainingY = anim.targetPos.row - anim.currentPos.row;
+					const remainingDist = Math.sqrt(
+						remainingX * remainingX + remainingY * remainingY
+					);
+
+					const grid = buildAnimatedGrid();
+					setGrid(grid);
+
+					if (remainingDist < ANIMATION_SPEED) {
+						console.log("piece animation complete...stopping");
+						animatingPieceRef.current = null;
+						animationRef.current.running = false;
+						onComplete();
+						return false;
+					}
+
+					return true;
+				},
+				0,
+				60
+			);
+
+			animate();
+		};
+
+		// Start animation - when complete, dispatch ANIMATION_COMPLETE
+		animatePieceMove(piece, finalFrom, finalTo, () => {
+			dispatch({ type: Actions.ANIMATION_COMPLETE });
+		});
+	}, [
+		state.phase,
+		state.previousPhase,
+		state.animatingMove,
+		state.board,
+		state.currentPlayer,
+		state.computerColor,
+		state.whiteTimeSeconds,
+		state.blackTimeSeconds,
+		setGrid,
+		gameSettings,
+	]);
+
+	// Unified cursor management: display and cells
+	useEffect(() => {
+		if (!isGameReady) return;
+
+		let display = true;
+		let cells = presets.cursor;
+
+		switch (state.phase) {
+			case GAME_PHASE.WAITING_FOR_PLAYER:
+				if (state.computerColor === state.currentPlayer) {
+					cells = presets.getCursor("?");
+				}
+				break;
+			case GAME_PHASE.WAITING_FOR_STOCKFISH:
+				cells = presets.getCursor("?");
+				break;
+			case GAME_PHASE.DATA_SCREEN:
+				display = false;
+				break;
+			case GAME_PHASE.MENU_ACTIONS:
+				display = false;
+				break;
+			case GAME_PHASE.MENU_SETTINGS:
+				display = false;
+				break;
+			case GAME_PHASE.SETUP_MENU:
+				display = false;
+				break;
+			case GAME_PHASE.SETUP_BOARD:
+				display = true;
+				if (state.selectedSetupPiece) {
+					cells = presets.getCursor(state.selectedSetupPiece.FENChar);
+				}
+				break;
+			case GAME_PHASE.REPLAY:
+				cells = presets.getCursor("replay");
+				break;
+			case GAME_PHASE.ANIMATING:
+				if (state.previousPhase === GAME_PHASE.REPLAY) {
+					cells = presets.getCursor("replay");
+				}
+				break;
+			case GAME_PHASE.PIECE_SELECTED:
+				display = true;
+				if (state.selectedSquare) {
+					const piece =
+						state.board[state.selectedSquare.row][
+						state.selectedSquare.col
+						];
+					cells = presets.getCursor(piece?.FENChar);
+				}
+				break;
+			case GAME_PHASE.ALERT:
+				display = false;
+				break;
+			default:
+				display = true;
+				break;
+		}
+
+		setCursor((prev) => ({ ...prev, display, cells }));
+	}, [
+		isGameReady,
+		state.phase,
+		state.previousPhase,
+		state.selectedSquare,
+		state.selectedSetupPiece,
+		state.board,
+		state.currentPlayer,
+		state.computerColor,
+		setCursor,
+	]);
+
+	// Clock - dispatches CLOCK_TICK every second when timer is running
+	useEffect(() => {
+		if (!isGameReady || !state.clockRunning) return;
+
+		const interval = setInterval(() => {
+			dispatch({ type: Actions.CLOCK_TICK });
+		}, 1000)
+
+		return () => clearInterval(interval);
+	}, [isGameReady, state.clockRunning, dispatch])
+
+	useEffect(() => {
+		setGameState({
+			name: "chess",
+			loadGame,
+			resetGame: () => { },
+			handleGameCursor,
+			handleGameDpad,
+			handleGameAction,
+			handleGameSelect,
+			handleGameStart,
+			handleGameCellClick: () => { },
+		});
+	}, [
+		setGameState,
+		loadGame,
+		handleGameCursor,
+		handleGameDpad,
+		handleGameAction,
+		handleGameSelect,
+		handleGameStart,
+	]);
+}
